@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>15分ファクトリー</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+        <div id="info-panel">
+            <div id="time-display">時間: 15:00</div>
+            <div id="goal-display">目標: 電子基板を10個クラフトしよう！</div>
+            <div id="building-status-display"></div> <!-- ここを追加 -->
+            <div id="inventory-display">インベントリ:</div>
+            <div id="log-display">ログ: ゲーム開始！</div>
+        </div>
+    </div>
+
+    <!-- レシピ選択モーダル -->
+    <div id="recipe-modal" class="modal">
+        <div class="modal-content">
+            <h2>レシピ選択</h2>
+            <div id="recipe-list">
+                <!-- レシピがここに動的に追加される -->
+            </div>
+            <button id="set-recipe-button">設定</button>
+            <button id="close-modal-button">閉じる</button>
+        </div>
+    </div>
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
