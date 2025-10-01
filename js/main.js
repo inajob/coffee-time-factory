@@ -1,8 +1,8 @@
 // js/main.js
 import { Game } from './game.js';
 import { Renderer } from './renderer.js';
-import { Miner, Furnace, ConveyorBelt, Assembler } from './entities.js';
-import { RECIPES } from './recipes.js'; // RECIPESをインポート
+import { Miner, Furnace, ConveyorBelt, Assembler, StorageChest, Splitter } from './entities.js';
+import { RECIPES, getFormattedRecipes } from './recipes.js'; // RECIPESとgetFormattedRecipesをインポート
 
 // ゲーム設定
 const GRID_WIDTH = 20;
@@ -12,6 +12,9 @@ const TILE_SIZE = 24;
 const game = new Game(GRID_WIDTH, GRID_HEIGHT);
 const canvas = document.getElementById('gameCanvas');
 const renderer = new Renderer(canvas, game, TILE_SIZE);
+
+// game-container の高さを canvas の高さに合わせる
+document.getElementById('game-container').style.height = `${canvas.height}px`;
 
 window.game = game; // デバッグ用にグローバルに公開
 
@@ -23,12 +26,14 @@ let currentMode = 'normal'; // 'normal', 'build', 'delete'
 let selectedBuilding = null; // 現在レシピ設定中の施設 (AssemblerまたはFurnace)
 
 // 施設タイプを日本語に変換
-function getJapaneseBuildingType(type) {
+export function getJapaneseBuildingType(type) {
     switch (type) {
         case 'conveyor': return 'ベルトコンベア';
         case 'miner': return '採掘機';
         case 'furnace': return 'かまど';
         case 'assembler': return '組立機';
+        case 'storage_chest': return 'ストレージチェスト';
+        case 'splitter': return '分配器';
         default: return type;
     }
 }
@@ -66,6 +71,16 @@ function gameLoop(currentTime) {
     lastTime = currentTime;
 
     game.update(deltaTime); // ゲームの状態を更新
+
+    // 手動採掘の処理
+    if (isMining && currentMode === 'normal' && miningTarget.x !== -1) {
+        miningProgress += deltaTime;
+        if (miningProgress >= MINING_TIME_PER_UNIT) {
+            game.mineResource(miningTarget.x, miningTarget.y);
+            miningProgress = 0;
+        }
+    }
+
     renderer.draw(game);   // 画面を描画
     updateModeDisplay(); // 毎フレーム更新
 
@@ -99,6 +114,18 @@ document.addEventListener('keydown', (e) => {
             game.addLog('建設モード: 組立機');
             updateModeDisplay();
             break;
+        case '5': // ストレージチェスト建設モード
+            currentBuildingType = 'storage_chest';
+            currentMode = 'build';
+            game.addLog('建設モード: ストレージチェスト');
+            updateModeDisplay();
+            break;
+        case '6': // 分配器建設モード
+            currentBuildingType = 'splitter';
+            currentMode = 'build';
+            game.addLog('建設モード: 分配器');
+            updateModeDisplay();
+            break;
         case 'r': // 建設中の施設を回転
             if (currentMode === 'build') {
                 const directions = ['north', 'east', 'south', 'west'];
@@ -123,7 +150,90 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-// マウスクリックで施設を建設/削除/設定
+let isMining = false;
+let miningProgress = 0;
+const MINING_TIME_PER_UNIT = 0.5; // 1個採掘するのにかかる時間（秒）
+let miningTarget = { x: -1, y: -1 };
+
+canvas.addEventListener('mousedown', (e) => {
+    if (e.button === 0) { // 左クリック
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        const gridX = Math.floor(mouseX / TILE_SIZE);
+        const gridY = Math.floor(mouseY / TILE_SIZE);
+
+        if (currentMode === 'normal') {
+            isMining = true;
+            miningTarget = { x: gridX, y: gridY };
+            miningProgress = 0; // 新しい採掘ターゲットなのでリセット
+        }
+    }
+});
+
+canvas.addEventListener('mouseup', (e) => {
+    if (e.button === 0) { // 左クリック
+        isMining = false;
+        miningProgress = 0;
+        miningTarget = { x: -1, y: -1 };
+    }
+});
+
+canvas.addEventListener('mousemove', (e) => {
+    if (isMining && currentMode === 'normal') {
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        const gridX = Math.floor(mouseX / TILE_SIZE);
+        const gridY = Math.floor(mouseY / TILE_SIZE);
+
+        if (gridX !== miningTarget.x || gridY !== miningTarget.y) {
+            // 採掘ターゲットが変更されたらリセット
+            miningTarget = { x: gridX, y: gridY };
+            miningProgress = 0;
+        }
+    }
+});
+
+const tooltip = document.getElementById('tooltip');
+
+// マウス移動でツールチップ表示
+canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    const gridX = Math.floor(mouseX / TILE_SIZE);
+    const gridY = Math.floor(mouseY / TILE_SIZE);
+
+    const tileInfo = game.getTileInfo(gridX, gridY);
+    let tooltipText = '';
+
+    if (tileInfo) {
+        if (tileInfo.building) {
+            tooltipText = renderer.getBuildingInfo(tileInfo.building);
+        } else if (tileInfo.resource) {
+            tooltipText = renderer.getResourceInfo(tileInfo.resource);
+        }
+    }
+
+    if (tooltipText) {
+        tooltip.innerHTML = tooltipText;
+        tooltip.style.left = `${e.clientX + 10}px`;
+        tooltip.style.top = `${e.clientY + 10}px`;
+        tooltip.style.display = 'block';
+    } else {
+        tooltip.style.display = 'none';
+    }
+});
+
+canvas.addEventListener('mouseleave', () => {
+    tooltip.style.display = 'none';
+});
+
+// マウスクリックで施設を建設/削除/設定 (normalモードでのクリックイベントは残す)
 canvas.addEventListener('click', (e) => {
     const rect = canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
@@ -136,11 +246,17 @@ canvas.addEventListener('click', (e) => {
         game.placeBuilding(gridX, gridY, currentBuildingType, currentBuildingDirection);
     } else if (currentMode === 'delete') {
         game.removeBuilding(gridX, gridY);
-    } else { // normalモードでクリックした場合
+    } else if (currentMode === 'normal') { // normalモードでクリックした場合
         const clickedBuilding = game.grid[gridY][gridX].building;
-        if (clickedBuilding instanceof Assembler || clickedBuilding instanceof Furnace) { // Furnaceにも対応
-            selectedBuilding = clickedBuilding;
-            openRecipeModal(selectedBuilding.type);
+        if (clickedBuilding) {
+            if (clickedBuilding instanceof Assembler || clickedBuilding instanceof Furnace) { // AssemblerまたはFurnaceの場合、レシピモーダルを開く
+                selectedBuilding = clickedBuilding;
+                openRecipeModal(selectedBuilding.type);
+            } else { // その他の施設の場合、アイテム回収を試みる
+                game.collectItemsFromBuilding(gridX, gridY);
+            }
+        } else {
+            // 施設がない場所をクリックした場合、何もしない
         }
     }
 });
@@ -191,6 +307,10 @@ function closeRecipeModal() {
 
 // 初期表示
 updateModeDisplay();
+
+// チートシートの内容を生成して表示
+const cheatSheetContent = document.getElementById('cheat-sheet-content');
+cheatSheetContent.innerHTML = getFormattedRecipes(renderer._getItemJapaneseName.bind(renderer));
 
 // ゲームループ開始
 requestAnimationFrame(gameLoop);

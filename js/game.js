@@ -1,6 +1,6 @@
 // js/game.js
-import { Miner, Furnace, ConveyorBelt, Item, Assembler } from './entities.js'; // Playerを削除
-import { RECIPES } from './recipes.js'; // RECIPESをインポート
+import { Miner, Furnace, ConveyorBelt, Item, Assembler, StorageChest, Splitter } from './entities.js';
+import { RECIPES, BUILDING_COSTS } from './recipes.js'; // RECIPESとBUILDING_COSTSをインポート
 
 export class Game {
     constructor(gridWidth, gridHeight) {
@@ -15,10 +15,16 @@ export class Game {
         this.currentBuildingType = null; // 建設中の施設タイプ
         this.currentBuildingDirection = 'north'; // 建設中の施設の向き
 
-        this.electronicCircuitCount = 0; // 電子基板の生産数を追跡
-        this.goal = { type: 'electronic_circuit', targetCount: 10 }; // 新しい目標
+        this.goalItemCount = 0; // 最終目標アイテムの生産数を追跡
+        this.goal = { type: 'robot_arm', targetCount: 100 }; // 新しい目標
+        this.isGameOver = false; // ゲームオーバーフラグを追加
 
         this.initializeResources(); // 資源を初期配置
+
+        // 初期インベントリ
+        this.addItemToInventory('iron_plate', 30);
+        this.addItemToInventory('copper_plate', 15);
+        this.addItemToInventory('plastic', 2);
     }
 
     createEmptyGrid() {
@@ -52,11 +58,17 @@ export class Game {
         // 石炭の配置
         this.grid[12][3].resource = { type: 'coal', amount: 1200 };
         this.grid[12][4].resource = { type: 'coal', amount: 1200 };
+        this.grid[13][3].resource = { type: 'coal', amount: 1200 }; // 追加
+        this.grid[13][4].resource = { type: 'coal', amount: 1200 }; // 追加
 
-        // crude_oil の配置は削除
+        // 石英鉱石の配置
+        this.grid[2][10].resource = { type: 'quartz_ore', amount: 1000 };
+        this.grid[2][11].resource = { type: 'quartz_ore', amount: 1000 };
     }
 
     update(deltaTime) {
+        if (this.isGameOver) return; // ゲームオーバーなら更新しない
+
         this.time = Math.max(0, this.time - deltaTime);
 
         // 各施設の更新
@@ -66,15 +78,43 @@ export class Game {
                 if (tile.building) {
                     tile.building.update(deltaTime, this);
 
-                    // 施設からアイテムを排出するロジック (簡易版)
+                    // Miner, Furnace, Assemblerからの排出
                     if (tile.building.outputInventory && tile.building.outputInventory.length > 0) {
                         const nextTile = this.getAdjacentTile(x, y, tile.building.direction);
                         if (nextTile && nextTile.building instanceof ConveyorBelt) {
                             const itemToMove = tile.building.outputInventory[0];
-                            // コンベアに空きがあるか、または同じ種類のアイテムが流れていて合流可能か
-                            if (nextTile.building.items.length < 2) { // 簡易的に2個までとする
-                                nextTile.building.items.push(new Item(itemToMove.type, 0)); // コンベアの先頭に追加
-                                tile.building.outputInventory.shift(); // 施設からアイテムを削除
+                            if (nextTile.building.items.length < 2) {
+                                nextTile.building.items.push(new Item(itemToMove.type, 0));
+                                tile.building.outputInventory.shift();
+                            }
+                        }
+                    }
+                    // Splitterからの排出
+                    if (tile.building instanceof Splitter) {
+                        // outputInventory1からの排出
+                        if (tile.building.outputInventory1.length > 0) {
+                            // Splitterの向きに応じてoutput1の排出方向を決定
+                            const output1Direction = this._getSplitterOutputDirection(tile.building.direction, 1);
+                            const nextTile = this.getAdjacentTile(x, y, output1Direction);
+                            if (nextTile && nextTile.building instanceof ConveyorBelt) {
+                                const itemToMove = tile.building.outputInventory1[0];
+                                if (nextTile.building.items.length < 2) {
+                                    nextTile.building.items.push(new Item(itemToMove.type, 0));
+                                    tile.building.outputInventory1.shift();
+                                }
+                            }
+                        }
+                        // outputInventory2からの排出
+                        if (tile.building.outputInventory2.length > 0) {
+                            // Splitterの向きに応じてoutput2の排出方向を決定
+                            const output2Direction = this._getSplitterOutputDirection(tile.building.direction, 2);
+                            const nextTile = this.getAdjacentTile(x, y, output2Direction);
+                            if (nextTile && nextTile.building instanceof ConveyorBelt) {
+                                const itemToMove = tile.building.outputInventory2[0];
+                                if (nextTile.building.items.length < 2) {
+                                    nextTile.building.items.push(new Item(itemToMove.type, 0));
+                                    tile.building.outputInventory2.shift();
+                                }
                             }
                         }
                     }
@@ -100,26 +140,57 @@ export class Game {
                                 // 次のタイルがコンベアの場合
                                 if (nextTile.building instanceof ConveyorBelt) {
                                     // 次のコンベアに空きがあるか、または詰まっていないか
-                                    if (nextTile.building.items.length < 2) { // 簡易的に2個まで
-                                        nextTile.building.items.push(new Item(item.type, 0)); // 次のコンベアの先頭に追加
+                                    if (nextTile.building.items.length < 2) { // 簡易的に2個までとする
+                                        // 超過分を次のコンベアのpositionに引き継ぐ
+                                        const newPosition = item.position - 1.0;
+                                        nextTile.building.items.push(new Item(item.type, newPosition));
                                         conveyor.items.splice(i, 1); // 現在のコンベアから削除
                                     } else {
                                         // 次のコンベアが詰まっている場合、現在のコンベアの終端で停止
                                         item.position = 0.99; // 終端で停止
                                     }
-                                }
-                                // 次のタイルが施設の場合 (簡易的に搬入)
-                                else if (nextTile.building) {
-                                    // かまどの場合、石炭は燃料インベントリへ、それ以外は入力インベントリへ
-                                    if (nextTile.building instanceof Furnace && item.type === 'coal') {
-                                        nextTile.building.fuelInventory.push(item); // 燃料インベントリへ
-                                        conveyor.items.splice(i, 1); // 現在のコンベアから削除
-                                    } else if (nextTile.building.inputInventory) {
-                                        nextTile.building.inputInventory.push(item); // 入力インベントリへ
-                                        conveyor.items.splice(i, 1); // 現在のコンベアから削除
+                                } else if (nextTile.building) {
+                                    // Assemblerの場合、MapのinputInventoryへ、Furnaceの場合は配列のinputInventoryへ
+                                    if (nextTile.building instanceof Assembler) {
+                                        const currentAmount = nextTile.building.inputInventory.get(item.type) || 0;
+                                        if (currentAmount < nextTile.building.inputInventoryCapacity) {
+                                            nextTile.building.inputInventory.set(item.type, currentAmount + 1); // 入力インベントリへ
+                                            conveyor.items.splice(i, 1); // 現在のコンベアから削除
+                                        } else {
+                                            item.position = 0.99; // 入力インベントリが満杯
+                                        }
+                                    } else if (nextTile.building instanceof Furnace) { // Furnaceの場合 (MapのinputInventory)
+                                        const currentAmount = nextTile.building.inputInventory.get(item.type) || 0;
+                                        if (currentAmount < nextTile.building.inputInventoryCapacity) {
+                                            nextTile.building.inputInventory.set(item.type, currentAmount + 1); // 入力インベントリへ
+                                            conveyor.items.splice(i, 1); // 現在のコンベアから削除
+                                        } else {
+                                            item.position = 0.99; // 入力インベントリが満杯
+                                        }
+                                    } else if (nextTile.building instanceof StorageChest) { // StorageChestの場合 (配列のinputInventory)
+                                        if (nextTile.building.inputInventory.length < nextTile.building.inputInventoryCapacity) {
+                                            nextTile.building.inputInventory.push(item); // 入力インベントリへ
+                                            conveyor.items.splice(i, 1); // 現在のコンベアから削除
+                                        } else {
+                                            item.position = 0.99; // StorageChestが満杯
+                                        }
+                                    } else if (nextTile.building instanceof Splitter) { // 次のタイルがSplitterの場合
+                                        if (nextTile.building.inputInventory.length < nextTile.building.inputInventoryCapacity) {
+                                            nextTile.building.inputInventory.push(item); // Splitterのインベントリへ
+                                            conveyor.items.splice(i, 1); // 現在のコンベアから削除
+                                        } else {
+                                            item.position = 0.99; // Splitterが満杯
+                                        }
                                     } else {
                                         // 搬入先がない場合、アイテムはコンベアの終端で停止
                                         item.position = 0.99;
+                                    }
+                                } else if (nextTile.building instanceof StorageChest) { // 次のタイルがStorageChestの場合
+                                    if (nextTile.building.inputInventory.length < nextTile.building.inputInventoryCapacity) {
+                                        nextTile.building.inputInventory.push(item); // StorageChestのインベントリへ
+                                        conveyor.items.splice(i, 1); // 現在のコンベアから削除
+                                    } else {
+                                        item.position = 0.99; // StorageChestが満杯
                                     }
                                 } else {
                                     // 次のタイルが何もない場合、アイテムはコンベアの終端で停止
@@ -136,10 +207,9 @@ export class Game {
         }
 
         // 最終目標の達成判定
-        if (this.electronicCircuitCount >= this.goal.targetCount) {
-            this.addLog(`ゲームクリア！ ${this.goal.type}を${this.goal.targetCount}個クラフトしました！`);
-            // ゲームを停止するなどの処理
-            // this.time = 0; // 時間を停止
+        if (this.inventory[this.goal.type] && this.inventory[this.goal.type] >= this.goal.targetCount) {
+            this.addLog(`ゲームクリア！ ${this.goal.type}を${this.goal.targetCount}個インベントリに入れました！`);
+            this.isGameOver = true; // ゲームを停止
         }
     }
 
@@ -157,6 +227,29 @@ export class Game {
         if (this.grid[y][x].resource !== null && type !== 'miner') {
             this.addLog("資源の上に施設を建設することはできません（採掘機を除く）。");
             return false;
+        }
+
+        // 建設コストのチェックと消費
+        const costs = BUILDING_COSTS[type];
+        if (costs) {
+            let canBuild = true;
+            const missingItems = [];
+            for (const cost of costs) {
+                if ((this.inventory[cost.type] || 0) < cost.amount) {
+                    canBuild = false;
+                    missingItems.push(`${cost.type} x ${cost.amount - (this.inventory[cost.type] || 0)}`);
+                }
+            }
+
+            if (!canBuild) {
+                this.addLog(`建設に必要な素材が足りません: ${missingItems.join(', ')}`);
+                return false;
+            }
+
+            // 素材を消費
+            for (const cost of costs) {
+                this.inventory[cost.type] -= cost.amount;
+            }
         }
 
         let newBuilding = null;
@@ -178,6 +271,12 @@ export class Game {
             case 'assembler': // Assemblerのケースを追加
                 newBuilding = new Assembler(x, y, direction);
                 // デフォルトレシピ設定を削除 (UIで設定するため)
+                break;
+            case 'storage_chest': // StorageChestのケースを追加
+                newBuilding = new StorageChest(x, y);
+                break;
+            case 'splitter': // Splitterのケースを追加
+                newBuilding = new Splitter(x, y, direction);
                 break;
             default:
                 this.addLog("不明な施設タイプです。");
@@ -239,6 +338,18 @@ export class Game {
         return false;
     }
 
+    // スプリッターの出力方向を決定するヘルパーメソッド
+    _getSplitterOutputDirection(splitterDirection, outputPort) {
+        const directions = ['north', 'east', 'south', 'west'];
+        const currentIndex = directions.indexOf(splitterDirection);
+
+        if (outputPort === 1) { // 左側出力
+            return directions[(currentIndex + 3) % 4]; // 反時計回りに90度
+        } else { // outputPort === 2 (右側出力)
+            return directions[(currentIndex + 1) % 4]; // 時計回りに90度
+        }
+    }
+
     // インベントリにアイテムを追加するヘルパーメソッド
     addItemToInventory(itemType, count = 1) {
         if (this.inventory[itemType]) {
@@ -247,5 +358,86 @@ export class Game {
             this.inventory[itemType] = count;
         }
         this.addLog(`${itemType}を${count}個インベントリに追加しました。`);
+    }
+
+    // 施設からアイテムを回収するメソッド
+    collectItemsFromBuilding(x, y) {
+        if (x < 0 || x >= this.gridWidth || y < 0 || y >= this.gridHeight) return;
+        const building = this.grid[y][x].building;
+
+        if (!building) {
+            this.addLog("その場所には施設がありません。");
+            return;
+        }
+
+        let collectedCount = 0;
+        let collectedItemType = '';
+
+        // Miner, Furnace, Assembler, StorageChestからアイテムを回収
+        if (building.outputInventory && building.outputInventory.length > 0) {
+            while (building.outputInventory.length > 0) {
+                const item = building.outputInventory.shift();
+                this.addItemToInventory(item.type, 1);
+                collectedItemType = item.type;
+                collectedCount++;
+            }
+        } else if (building.inputInventory && building.inputInventory.length > 0 && (building instanceof StorageChest || building instanceof Splitter)) {
+            // StorageChest, Splitterの場合はinputInventoryから回収
+            while (building.inputInventory.length > 0) {
+                const item = building.inputInventory.shift();
+                this.addItemToInventory(item.type, 1);
+                collectedItemType = item.type;
+                collectedCount++;
+            }
+        } else if (building instanceof Splitter && (building.outputInventory1.length > 0 || building.outputInventory2.length > 0)) {
+            // SplitterのoutputInventory1から回収
+            while (building.outputInventory1.length > 0) {
+                const item = building.outputInventory1.shift();
+                this.addItemToInventory(item.type, 1);
+                collectedItemType = item.type;
+                collectedCount++;
+            }
+            // SplitterのoutputInventory2から回収
+            while (building.outputInventory2.length > 0) {
+                const item = building.outputInventory2.shift();
+                this.addItemToInventory(item.type, 1);
+                collectedItemType = item.type;
+                collectedCount++;
+            }
+        }
+
+        if (collectedCount > 0) {
+            this.addLog(`${collectedItemType}を${collectedCount}個、${building.type}から回収しました。`);
+        } else {
+            this.addLog(`${building.type}には回収できるアイテムがありません。`);
+        }
+    }
+
+    mineResource(x, y) {
+        if (x < 0 || x >= this.gridWidth || y < 0 || y >= this.gridHeight) return;
+        const tile = this.grid[y][x];
+        if (tile.resource && tile.resource.amount > 0) {
+            const minedItemType = tile.resource.type;
+            this.addItemToInventory(minedItemType, 1);
+            tile.resource.amount--;
+            this.addLog(`${minedItemType}を1個手動で採掘しました。`);
+        } else if (tile.resource && tile.resource.amount === 0) {
+            this.addLog("資源が枯渇しました。");
+        }
+    }
+
+    // タイルの情報を取得するメソッド
+    getTileInfo(x, y) {
+        if (x < 0 || x >= this.gridWidth || y < 0 || y >= this.gridHeight) {
+            return null;
+        }
+        const tile = this.grid[y][x];
+        return {
+            x: x,
+            y: y,
+            type: tile.type,
+            resource: tile.resource,
+            building: tile.building
+        };
     }
 }

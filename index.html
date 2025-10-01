@@ -9,13 +9,19 @@
 <body>
     <div id="game-container">
         <canvas id="gameCanvas"></canvas>
+        <div id="tooltip" class="tooltip"></div>
         <div id="info-panel">
             <div id="time-display">時間: 15:00</div>
-            <div id="goal-display">目標: 電子基板を10個クラフトしよう！</div>
+            <div id="goal-display">目標: ロボットアームを1個クラフトしよう！</div>
             <div id="building-status-display"></div> <!-- ここを追加 -->
             <div id="inventory-display">インベントリ:</div>
             <div id="log-display">ログ: ゲーム開始！</div>
         </div>
+    </div>
+
+    <div id="cheat-sheet" class="cheat-sheet">
+        <h2>レシピチートシート</h2>
+        <div id="cheat-sheet-content"></div>
     </div>
 
     <!-- レシピ選択モーダル -->

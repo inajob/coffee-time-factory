@@ -1,3 +1,5 @@
+import { getItemColor } from './utils.js';
+
 // js/entities.js
 
 // Playerクラス全体を削除
@@ -60,11 +62,17 @@ export class Miner extends Building {
         this.miningSpeed = 1; // 1秒に1個
         this.miningProgress = 0;
         this.outputInventory = []; // 採掘したアイテムを一時的に保持
+        this.outputInventoryCapacity = 5; // 出力インベントリの容量
     }
 
     update(deltaTime, game) {
         // 採掘ロジック
         const tile = game.grid[this.y][this.x];
+        // outputInventoryが満杯の場合は採掘しない
+        if (this.outputInventory.length >= this.outputInventoryCapacity) {
+            return;
+        }
+
         if (tile.resource && tile.resource.amount > 0) {
             this.miningProgress += deltaTime;
             if (this.miningProgress >= this.miningSpeed) {
@@ -94,25 +102,25 @@ export class Furnace extends Building {
         super(x, y, 'furnace', direction);
         this.craftingSpeed = 1; // 1秒に1個
         this.craftingProgress = 0;
-        this.inputInventory = []; // 材料を保持
+        this.inputInventory = new Map(); // 材料をMapで保持 { type: count }
         this.outputInventory = []; // 完成品を保持
-        this.fuelInventory = []; // 燃料を保持
-        this.currentRecipe = null; // { input: [{type: 'iron_ore', amount: 1}], output: [{type: 'iron_plate', amount: 1}], fuel: [{type: 'coal', amount: 1}] }
+        this.currentRecipe = null; // { input: [{type: 'iron_ore', amount: 1}], output: [{type: 'iron_plate', amount: 1}] }
+        this.outputInventoryCapacity = 5; // 出力インベントリの容量
+        this.inputInventoryCapacity = 10; // 入力インベントリの容量 (材料と燃料を保持できる量に調整)
     }
 
     update(deltaTime, game) {
         // レシピが設定されていない場合は処理を中断
         if (!this.currentRecipe) return;
 
-        // 燃料のチェックをcurrentRecipe.fuelに基づいて行う
-        const hasFuel = this.currentRecipe.fuel.every(req =>
-            this.fuelInventory.filter(item => item.type === req.type).length >= req.amount
-        );
-        if (!hasFuel) return; // 燃料が足りないと動かない
+        // outputInventoryが満杯の場合は生産しない
+        if (this.outputInventory.length >= this.outputInventoryCapacity) {
+            return;
+        }
 
         // 材料が揃っているかチェック
         const hasIngredients = this.currentRecipe.input.every(req =>
-            this.inputInventory.filter(item => item.type === req.type).length >= req.amount
+            (this.inputInventory.get(req.type) || 0) >= req.amount
         );
 
         if (hasIngredients) {
@@ -120,16 +128,10 @@ export class Furnace extends Building {
             if (this.craftingProgress >= this.craftingSpeed) {
                 // 材料を消費
                 this.currentRecipe.input.forEach(req => {
-                    for (let i = 0; i < req.amount; i++) {
-                        const index = this.inputInventory.findIndex(item => item.type === req.type);
-                        if (index !== -1) this.inputInventory.splice(index, 1);
-                    }
-                });
-                // 燃料を消費
-                this.currentRecipe.fuel.forEach(req => {
-                    for (let i = 0; i < req.amount; i++) {
-                        const index = this.fuelInventory.findIndex(item => item.type === req.type);
-                        if (index !== -1) this.fuelInventory.splice(index, 1);
+                    const currentAmount = this.inputInventory.get(req.type) || 0;
+                    this.inputInventory.set(req.type, currentAmount - req.amount);
+                    if (this.inputInventory.get(req.type) <= 0) {
+                        this.inputInventory.delete(req.type);
                     }
                 });
 
@@ -201,41 +203,35 @@ export class ConveyorBelt extends Building {
                 drawY = itemY + tileSize / 2 - itemSize / 2;
             }
 
-            ctx.fillStyle = this._getItemColor(item.type);
+            ctx.fillStyle = getItemColor(item.type);
             ctx.fillRect(drawX, drawY, itemSize, itemSize);
         });
-    }
-
-    _getItemColor(itemType) {
-        switch (itemType) {
-            case 'iron_ore': return 'brown';
-            case 'iron_plate': return 'silver';
-            case 'copper_ore': return 'peru';
-            case 'copper_plate': return 'chocolate';
-            case 'coal': return 'black';
-            case 'copper_wire': return 'goldenrod'; // 銅線
-            case 'electronic_circuit': return 'lime'; // 電子基板
-            default: return 'white';
-        }
     }
 }
 
 export class Assembler extends Building {
     constructor(x, y, direction = 'north') {
         super(x, y, 'assembler', direction);
-        this.craftingSpeed = 1; // 1秒に1個
         this.craftingProgress = 0;
-        this.inputInventory = []; // 材料を保持
+        this.inputInventory = new Map(); // 材料をMapで保持 { type: count }
         this.outputInventory = []; // 完成品を保持
         this.currentRecipe = null; // { input: [{type: 'iron_plate', amount: 1}], output: [{type: 'gear', amount: 1}] }
+        this.outputInventoryCapacity = 5; // 出力インベントリの容量
+        this.inputInventoryCapacity = 5; // 入力インベントリの容量
     }
 
     update(deltaTime, game) {
         if (!this.currentRecipe) return;
 
+        // outputInventoryが満杯、または今回の生産で満杯になる場合は生産しない
+        const totalOutputAmount = this.currentRecipe.output.reduce((sum, out) => sum + out.amount, 0);
+        if (this.outputInventory.length + totalOutputAmount > this.outputInventoryCapacity) {
+            return;
+        }
+
         // 材料が揃っているかチェック
         const hasIngredients = this.currentRecipe.input.every(req =>
-            this.inputInventory.filter(item => item.type === req.type).length >= req.amount
+            (this.inputInventory.get(req.type) || 0) >= req.amount
         );
 
         if (hasIngredients) {
@@ -243,9 +239,10 @@ export class Assembler extends Building {
             if (this.craftingProgress >= this.craftingSpeed) {
                 // 材料を消費
                 this.currentRecipe.input.forEach(req => {
-                    for (let i = 0; i < req.amount; i++) {
-                        const index = this.inputInventory.findIndex(item => item.type === req.type);
-                        if (index !== -1) this.inputInventory.splice(index, 1);
+                    const currentAmount = this.inputInventory.get(req.type) || 0;
+                    this.inputInventory.set(req.type, currentAmount - req.amount);
+                    if (this.inputInventory.get(req.type) <= 0) {
+                        this.inputInventory.delete(req.type);
                     }
                 });
 
@@ -253,9 +250,9 @@ export class Assembler extends Building {
                 this.currentRecipe.output.forEach(out => {
                     for (let i = 0; i < out.amount; i++) {
                         this.outputInventory.push({ type: out.type });
-                        // 電子基板が作られたらカウント
+                        // 最終目標アイテムが作られたらカウント
                         if (out.type === game.goal.type) {
-                            game.electronicCircuitCount++;
+                            game.goalItemCount++;
                         }
                     }
                 });
@@ -280,5 +277,113 @@ export class Item {
     constructor(type, position = 0) {
         this.type = type;
         this.position = position; // 0.0 (入口) から 1.0 (出口)
+    }
+}
+
+export class StorageChest extends Building {
+    constructor(x, y) {
+        super(x, y, 'storage_chest', 'north'); // 向きは関係ないのでnorthで固定
+        this.inputInventory = []; // アイテムを貯蔵
+        this.inputInventoryCapacity = 10; // ストレージチェストの容量
+    }
+
+    update(deltaTime, game) {
+        // 特に自動的な処理はなし
+    }
+
+    draw(ctx, tileSize) {
+        ctx.fillStyle = '#8B4513'; // 茶色
+        ctx.fillRect(this.x * tileSize, this.y * tileSize, tileSize, tileSize);
+        ctx.strokeStyle = 'white';
+        ctx.strokeRect(this.x * tileSize, this.y * tileSize, tileSize, tileSize);
+
+        // チェストの蓋のような模様
+        ctx.fillStyle = '#A0522D';
+        ctx.fillRect(this.x * tileSize + tileSize * 0.1, this.y * tileSize + tileSize * 0.1, tileSize * 0.8, tileSize * 0.3);
+        ctx.fillRect(this.x * tileSize + tileSize * 0.1, this.y * tileSize + tileSize * 0.6, tileSize * 0.8, tileSize * 0.3);
+    }
+}
+
+export class Splitter extends Building {
+    constructor(x, y, direction = 'north') {
+        super(x, y, 'splitter', direction);
+        this.inputInventory = [];
+        this.outputInventory1 = []; // 左側出力
+        this.outputInventory2 = []; // 右側出力
+        this.inputInventoryCapacity = 5;
+        this.outputInventoryCapacity = 5;
+        this.distributionTimer = 0;
+        this.distributionInterval = 0.5; // 0.5秒ごとに分配
+    }
+
+    update(deltaTime, game) {
+        this.distributionTimer += deltaTime;
+
+        if (this.distributionTimer >= this.distributionInterval) {
+            this.distributionTimer = 0;
+
+            if (this.inputInventory.length > 0) {
+                const itemToDistribute = this.inputInventory[0];
+
+                // どちらかの出力に空きがあるか
+                const hasSpace1 = this.outputInventory1.length < this.outputInventoryCapacity;
+                const hasSpace2 = this.outputInventory2.length < this.outputInventoryCapacity;
+
+                if (hasSpace1 && hasSpace2) {
+                    // 両方に空きがあれば交互に分配
+                    if (this.outputInventory1.length <= this.outputInventory2.length) {
+                        this.outputInventory1.push(this.inputInventory.shift());
+                    } else {
+                        this.outputInventory2.push(this.inputInventory.shift());
+                    }
+                } else if (hasSpace1) {
+                    // output1にのみ空きがあればそちらへ
+                    this.outputInventory1.push(this.inputInventory.shift());
+                } else if (hasSpace2) {
+                    // output2にのみ空きがあればそちらへ
+                    this.outputInventory2.push(this.inputInventory.shift());
+                }
+                // 両方満杯の場合はinputInventoryに留まる (バックプレッシャー)
+            }
+        }
+    }
+
+    draw(ctx, tileSize) {
+        ctx.fillStyle = '#696969'; // スプリッターの色
+        ctx.fillRect(this.x * tileSize, this.y * tileSize, tileSize, tileSize);
+        ctx.strokeStyle = 'white';
+        ctx.strokeRect(this.x * tileSize, this.y * tileSize, tileSize, tileSize);
+
+        // 分配方向を示す矢印
+        super._drawDirectionArrow(ctx, tileSize, this.direction, '#A9A9A9');
+
+        // 出力方向を示す矢印 (左右に分岐)
+        const centerX = this.x * tileSize + tileSize / 2;
+        const centerY = this.y * tileSize + tileSize / 2;
+        const arrowSize = tileSize / 4;
+
+        ctx.fillStyle = '#A9A9A9';
+        ctx.beginPath();
+        if (this.direction === 'north' || this.direction === 'south') {
+            // 左右に分岐
+            ctx.moveTo(centerX - arrowSize, centerY);
+            ctx.lineTo(centerX, centerY - arrowSize);
+            ctx.lineTo(centerX + arrowSize, centerY);
+
+            ctx.moveTo(centerX - arrowSize, centerY);
+            ctx.lineTo(centerX, centerY + arrowSize);
+            ctx.lineTo(centerX + arrowSize, centerY);
+        } else { // east, west
+            // 上下に分岐
+            ctx.moveTo(centerX, centerY - arrowSize);
+            ctx.lineTo(centerX - arrowSize, centerY);
+            ctx.lineTo(centerX, centerY + arrowSize);
+
+            ctx.moveTo(centerX, centerY - arrowSize);
+            ctx.lineTo(centerX + arrowSize, centerY);
+            ctx.lineTo(centerX, centerY + arrowSize);
+        }
+        ctx.closePath();
+        ctx.fill();
     }
 }

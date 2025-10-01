@@ -1,4 +1,6 @@
 // js/renderer.js
+import { Splitter } from './entities.js';
+import { getItemColor } from './utils.js';
 export class Renderer {
     constructor(canvas, game, tileSize) {
         this.canvas = canvas;
@@ -28,7 +30,7 @@ export class Renderer {
 
                 // 資源の描画
                 if (tile.resource) {
-                    this.ctx.fillStyle = this._getResourceColor(tile.resource.type);
+                    this.ctx.fillStyle = getItemColor(tile.resource.type);
                     this.ctx.beginPath();
                     this.ctx.arc(x * this.tileSize + this.tileSize / 2, y * this.tileSize + this.tileSize / 2, this.tileSize / 3, 0, Math.PI * 2);
                     this.ctx.fill();
@@ -55,24 +57,130 @@ export class Renderer {
 
         // UI情報の更新 (DOM操作)
         document.getElementById('time-display').textContent = `時間: ${Math.floor(game.time / 60).toString().padStart(2, '0')}:${Math.floor(game.time % 60).toString().padStart(2, '0')}`;
-        document.getElementById('goal-display').textContent = `目標: ${game.goal.type}を${game.goal.targetCount}個クラフト (${game.electronicCircuitCount}/${game.goal.targetCount})`;
-        document.getElementById('log-display').innerHTML = game.log.map(msg => `<div>${msg}</div>`).join('');
+        document.getElementById('goal-display').textContent = `目標: ${game.goal.type}を${game.goal.targetCount}個クラフト (${game.goalItemCount}/${game.goal.targetCount})`;
+        document.getElementById('log-display').innerHTML = game.log.slice().reverse().map(msg => `<div>${msg}</div>`).join('');
 
         // インベントリ表示
         const inventoryDisplay = document.getElementById('inventory-display');
         let inventoryHtml = 'インベントリ:<br>';
         for (const itemType in game.inventory) {
-            inventoryHtml += `<div>${itemType}: ${game.inventory[itemType]}</div>`;
+            if (game.inventory[itemType] > 0) { // 0個のアイテムは表示しない
+                inventoryHtml += `<div>${this._getItemJapaneseName(itemType)}: ${game.inventory[itemType]}</div>`;
+            }
         }
         inventoryDisplay.innerHTML = inventoryHtml;
     }
 
-    _getResourceColor(resourceType) {
-        switch (resourceType) {
-            case 'iron_ore': return 'sienna';
-            case 'copper_ore': return 'darkgoldenrod';
-            case 'coal': return 'darkslategray';
-            default: return 'white';
+    _getItemJapaneseName(itemType) {
+        switch (itemType) {
+            case 'iron_ore': return '鉄鉱石';
+            case 'copper_ore': return '銅鉱石';
+            case 'coal': return '石炭';
+            case 'quartz_ore': return '石英鉱石';
+            case 'iron_plate': return '鉄板';
+            case 'copper_plate': return '銅板';
+            case 'copper_wire': return '銅線';
+            case 'gear': return '歯車';
+            case 'glass': return 'ガラス';
+            case 'plastic': return 'プラスチック';
+            case 'electronic_circuit': return '電子基板';
+            case 'advanced_processor': return '高度プロセッサ';
+            case 'robot_arm': return 'ロボットアーム';
+            case 'storage_chest': return 'ストレージチェスト';
+            case 'splitter': return '分配器';
+            default: return itemType;
         }
+    }
+
+    // 施設の説明文を生成
+    getBuildingInfo(building) {
+        let info = `タイプ: ${this._getItemJapaneseName(building.type)}\n`;
+        if (building.currentRecipe && building.currentRecipe.name) {
+            info += `レシピ: ${building.currentRecipe.name}\n`;
+            info += `進捗: ${Math.floor(building.craftingProgress * 100 / building.craftingSpeed)}%\n`;
+        }
+
+        // 入力インベントリ
+        if (building.inputInventory) {
+            if (building.inputInventory instanceof Map) {
+                info += `入力 (${building.inputInventoryCapacity}):\n`;
+                if (building.inputInventory.size === 0) {
+                    info += `  (空)\n`;
+                } else {
+                    building.inputInventory.forEach((count, type) => {
+                        info += `  ${this._getItemJapaneseName(type)}: ${count}/${building.inputInventoryCapacity}\n`;
+                    });
+                }
+            } else if (building.inputInventory.length !== undefined) { // 配列の場合
+                info += `入力 (${building.inputInventoryCapacity}): ${building.inputInventory.length}/${building.inputInventoryCapacity}\n`;
+                if (building.inputInventory.length > 0) {
+                    const counts = {};
+                    building.inputInventory.forEach(item => {
+                        counts[item.type] = (counts[item.type] || 0) + 1;
+                    });
+                    for (const type in counts) {
+                        info += `  ${this._getItemJapaneseName(type)}: ${counts[type]}\n`;
+                    }
+                } else {
+                    info += `  (空)\n`;
+                }
+            }
+        }
+
+        // 出力インベントリ
+        if (building.outputInventory && building.outputInventory.length !== undefined) {
+            info += `出力 (${building.outputInventoryCapacity}): ${building.outputInventory.length}/${building.outputInventoryCapacity}\n`;
+            if (building.outputInventory.length > 0) {
+                const counts = {};
+                building.outputInventory.forEach(item => {
+                    counts[item.type] = (counts[item.type] || 0) + 1;
+                });
+                for (const type in counts) {
+                    info += `  ${this._getItemJapaneseName(type)}: ${counts[type]}\n`;
+                }
+            } else {
+                info += `  (空)\n`;
+            }
+        }
+
+        // Splitterの出力インベントリ
+        if (building instanceof Splitter) {
+            if (building.outputInventory1.length > 0) {
+                const counts = {};
+                building.outputInventory1.forEach(item => {
+                    counts[item.type] = (counts[item.type] || 0) + 1;
+                });
+                info += `出力1 (${building.outputInventoryCapacity}): ${building.outputInventory1.length}/${building.outputInventoryCapacity}\n`;
+                for (const type in counts) {
+                    info += `  ${this._getItemJapaneseName(type)}: ${counts[type]}\n`;
+                }
+            } else {
+                info += `出力1 (${building.outputInventoryCapacity}): (空)\n`;
+            }
+            if (building.outputInventory2.length > 0) {
+                const counts = {};
+                building.outputInventory2.forEach(item => {
+                    counts[item.type] = (counts[item.type] || 0) + 1;
+                });
+                info += `出力2 (${building.outputInventoryCapacity}): ${building.outputInventory2.length}/${building.outputInventoryCapacity}\n`;
+                for (const type in counts) {
+                    info += `  ${this._getItemJapaneseName(type)}: ${counts[type]}\n`;
+                }
+            } else {
+                info += `出力2 (${building.outputInventoryCapacity}): (空)\n`;
+            }
+        }
+
+        // コンベア上のアイテム (ConveyorBeltのみ)
+        if (building.type === 'conveyor' && building.items.length > 0) {
+            info += `アイテム: ${building.items.map(item => this._getItemJapaneseName(item.type)).join(', ')}\n`;
+        }
+
+        return info;
+    }
+
+    // 資源の説明文を生成
+    getResourceInfo(resource) {
+        return `資源: ${this._getItemJapaneseName(resource.type)}\n残量: ${resource.amount}`;
     }
 }
