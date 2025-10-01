@@ -285,10 +285,28 @@ export class StorageChest extends Building {
         super(x, y, 'storage_chest', 'north'); // 向きは関係ないのでnorthで固定
         this.inputInventory = []; // アイテムを貯蔵
         this.inputInventoryCapacity = 10; // ストレージチェストの容量
+        this.transferTimer = 0;
+        this.transferInterval = 1.0; // 1秒ごとに転送
     }
 
     update(deltaTime, game) {
-        // 特に自動的な処理はなし
+        this.transferTimer += deltaTime;
+
+        if (this.transferTimer >= this.transferInterval) {
+            this.transferTimer = 0;
+
+            if (this.inputInventory.length > 0) {
+                let collectedCount = 0;
+                let collectedItemType = '';
+                while (this.inputInventory.length > 0) {
+                    const item = this.inputInventory.shift();
+                    game.addItemToInventory(item.type, 1);
+                    collectedItemType = item.type;
+                    collectedCount++;
+                }
+                game.addLog(`${collectedItemType}を${collectedCount}個、ストレージチェストから自動回収しました。`);
+            }
+        }
     }
 
     draw(ctx, tileSize) {

@@ -16,19 +16,38 @@ export class Renderer {
     draw(game) {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // グリッドの描画
+        // 1. 地面とグリッド線の描画
         for (let y = 0; y < game.gridHeight; y++) {
             for (let x = 0; x < game.gridWidth; x++) {
                 const tile = game.grid[y][x];
                 this.ctx.fillStyle = '#444'; // 地面の色
                 if (tile.type === 'water') {
                     this.ctx.fillStyle = '#2a4d69'; // 水の色
-                } else if (tile.resource) {
-                    this.ctx.fillStyle = '#6b4e3e'; // 資源があるタイルの色
+                } else if (tile.resource) { // 資源があるタイルの地面の色を少し変える
+                    this.ctx.fillStyle = '#6b4e3e';
                 }
                 this.ctx.fillRect(x * this.tileSize, y * this.tileSize, this.tileSize, this.tileSize);
 
-                // 資源の描画
+                // グリッド線
+                this.ctx.strokeStyle = '#555';
+                this.ctx.strokeRect(x * this.tileSize, y * this.tileSize, this.tileSize, this.tileSize);
+            }
+        }
+
+        // 2. 施設の描画
+        for (let y = 0; y < game.gridHeight; y++) {
+            for (let x = 0; x < game.gridWidth; x++) {
+                const tile = game.grid[y][x];
+                if (tile.building) {
+                    tile.building.draw(this.ctx, this.tileSize);
+                }
+            }
+        }
+
+        // 3. 資源の描画 (施設の上に描画)
+        for (let y = 0; y < game.gridHeight; y++) {
+            for (let x = 0; x < game.gridWidth; x++) {
+                const tile = game.grid[y][x];
                 if (tile.resource) {
                     this.ctx.fillStyle = getItemColor(tile.resource.type);
                     this.ctx.beginPath();
@@ -40,15 +59,6 @@ export class Renderer {
                     this.ctx.textAlign = 'center';
                     this.ctx.fillText(tile.resource.amount, x * this.tileSize + this.tileSize / 2, y * this.tileSize + this.tileSize / 2 + 3);
                 }
-
-                // グリッド線
-                this.ctx.strokeStyle = '#555';
-                this.ctx.strokeRect(x * this.tileSize, y * this.tileSize, this.tileSize, this.tileSize);
-
-                // 施設の描画
-                if (tile.building) {
-                    tile.building.draw(this.ctx, this.tileSize);
-                }
             }
         }
 
@@ -57,7 +67,7 @@ export class Renderer {
 
         // UI情報の更新 (DOM操作)
         document.getElementById('time-display').textContent = `時間: ${Math.floor(game.time / 60).toString().padStart(2, '0')}:${Math.floor(game.time % 60).toString().padStart(2, '0')}`;
-        document.getElementById('goal-display').textContent = `目標: ${game.goal.type}を${game.goal.targetCount}個クラフト (${game.goalItemCount}/${game.goal.targetCount})`;
+        document.getElementById('goal-display').textContent = `目標: ${game.goal.type}を${game.goal.targetCount}個インベントリに入れる (${game.goalItemCount}/${game.goal.targetCount})`;
         document.getElementById('log-display').innerHTML = game.log.slice().reverse().map(msg => `<div>${msg}</div>`).join('');
 
         // インベントリ表示

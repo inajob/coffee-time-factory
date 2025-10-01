@@ -373,7 +373,7 @@ export class Game {
         let collectedCount = 0;
         let collectedItemType = '';
 
-        // Miner, Furnace, Assembler, StorageChestからアイテムを回収
+        // Miner, Furnace, Assemblerからアイテムを回収
         if (building.outputInventory && building.outputInventory.length > 0) {
             while (building.outputInventory.length > 0) {
                 const item = building.outputInventory.shift();
@@ -381,28 +381,16 @@ export class Game {
                 collectedItemType = item.type;
                 collectedCount++;
             }
-        } else if (building.inputInventory && building.inputInventory.length > 0 && (building instanceof StorageChest || building instanceof Splitter)) {
-            // StorageChest, Splitterの場合はinputInventoryから回収
-            while (building.inputInventory.length > 0) {
-                const item = building.inputInventory.shift();
-                this.addItemToInventory(item.type, 1);
-                collectedItemType = item.type;
-                collectedCount++;
-            }
-        } else if (building instanceof Splitter && (building.outputInventory1.length > 0 || building.outputInventory2.length > 0)) {
-            // SplitterのoutputInventory1から回収
-            while (building.outputInventory1.length > 0) {
-                const item = building.outputInventory1.shift();
-                this.addItemToInventory(item.type, 1);
-                collectedItemType = item.type;
-                collectedCount++;
-            }
-            // SplitterのoutputInventory2から回収
-            while (building.outputInventory2.length > 0) {
-                const item = building.outputInventory2.shift();
-                this.addItemToInventory(item.type, 1);
-                collectedItemType = item.type;
-                collectedCount++;
+        } else if (building.inputInventory instanceof Map) { // Furnace, Assemblerの場合
+            if (building.inputInventory.size > 0) {
+                for (const [type, count] of building.inputInventory) {
+                    for (let i = 0; i < count; i++) {
+                        this.addItemToInventory(type, 1);
+                        collectedItemType = type;
+                        collectedCount++;
+                    }
+                }
+                building.inputInventory.clear();
             }
         }
 
