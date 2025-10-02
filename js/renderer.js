@@ -143,12 +143,11 @@ export class Renderer {
         // game.player.draw(this.ctx, this.tileSize);
 
         // UI情報の更新 (DOM操作)
-        document.getElementById('time-display').textContent = `時間: ${Math.floor(game.time / 60).toString().padStart(2, '0')}:${Math.floor(game.time % 60).toString().padStart(2, '0')}`;
-        const goalDisplay = document.getElementById('goal-display');
+        document.getElementById('time-display').textContent = `経過時間: ${Math.floor(game.time / 60).toString().padStart(2, '0')}:${Math.floor(game.time % 60).toString().padStart(2, '0')}`;
         if (game.isGameOver) {
-            goalDisplay.textContent = `ロボット生産レート: ${game.robotProductionRate.toFixed(2)}個/秒`;
+            document.getElementById('goal-display').textContent = `ロボット生産レート: ${game.robotProductionRate.toFixed(2)}個/秒`;
         } else {
-            goalDisplay.textContent = `目標: ${game.goal.type}を${game.goal.targetCount}個インベントリに入れる (${game.goalItemCount}/${game.goal.targetCount})`;
+            document.getElementById('goal-display').textContent = `目標: ${game.goal.type}を${game.goal.targetCount}個インベントリに入れる (${game.goalItemCount}/${game.goal.targetCount})`;
         }
         document.getElementById('shipped-robots-display').textContent = `出荷ロボット数: ${game.totalRobotsShipped}`;
         document.getElementById('log-display').innerHTML = game.log.slice().reverse().map(msg => `<div>${msg}</div>`).join('');

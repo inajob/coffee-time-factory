@@ -8,7 +8,7 @@ export class Game {
         this.gridHeight = gridHeight;
         this.grid = this.createEmptyGrid();
         // this.player = new Player(Math.floor(gridWidth / 2), Math.floor(gridHeight / 2)); // Playerクラスのインスタンス化を削除
-        this.time = 15 * 60; // 15 minutes in seconds
+        this.time = 0; // 0からカウントアップ
         this.inventory = {}; // { 'item_type': count }
         this.log = ["ゲーム開始！"];
 
@@ -74,9 +74,7 @@ export class Game {
     }
 
     update(deltaTime) {
-        this.time = Math.max(0, this.time - deltaTime);
-
-        // 各施設の更新
+        this.time += deltaTime; // カウントアップに変更
         for (let y = 0; y < this.gridHeight; y++) {
             for (let x = 0; x < this.gridWidth; x++) {
                 const tile = this.grid[y][x];

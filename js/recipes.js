@@ -103,5 +103,20 @@ export function getFormattedRecipes(getItemJapaneseName) {
         formattedText += `<div class="cheat-sheet-recipe">${getJapaneseBuildingType(buildingType)}: ${costs}</div>`;
     }
 
+    formattedText += '<div class="cheat-sheet-category">--- キーボードショートカット ---</div>';
+    formattedText += '<div class="cheat-sheet-recipe"><b>1</b>: ベルトコンベア建設モード</div>';
+    formattedText += '<div class="cheat-sheet-recipe"><b>2</b>: 採掘機建設モード</div>';
+    formattedText += '<div class="cheat-sheet-recipe"><b>3</b>: かまど建設モード</div>';
+    formattedText += '<div class="cheat-sheet-recipe"><b>4</b>: 組立機建設モード</div>';
+    formattedText += '<div class="cheat-sheet-recipe"><b>5</b>: ストレージチェスト建設モード</div>';
+    formattedText += '<div class="cheat-sheet-recipe"><b>6</b>: 分配器建設モード</div>';
+    formattedText += '<div class="cheat-sheet-recipe"><b>7</b>: 出荷ターミナル建設モード</div>';
+    formattedText += '<div class="cheat-sheet-recipe"><b>R</b>: 建設中の施設の向きを回転</div>';
+    formattedText += '<div class="cheat-sheet-recipe"><b>X</b>: 削除モード</div>';
+    formattedText += '<div class="cheat-sheet-recipe"><b>Esc</b>: モード解除</div>';
+
+    formattedText += '<div class="cheat-sheet-category">--- アイテム回収 ---</div>';
+    formattedText += '<div class="cheat-sheet-recipe">通常モードで施設をクリックすると、その施設の出力インベントリ（または入力インベントリ）にあるアイテムを回収できます。</div>';
+
     return formattedText;
 }
