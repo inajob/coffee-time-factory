@@ -14,7 +14,8 @@ export function getItemColor(itemType) {
         case 'plastic': return 'mediumseagreen';    // プラスチック: 中程度の海緑色
         case 'electronic_circuit': return 'green';  // 電子基板: 緑色
         case 'advanced_processor': return 'darkblue'; // 高度プロセッサ: 濃い青
-        case 'robot_arm': return 'red';             // ロボットアーム: 赤色
+        case 'robot_body': return 'purple';     // ロボットボディ: 紫色
+        case 'robot': return 'red';        // ロボット: 赤色
         default: return 'white';
     }
 }

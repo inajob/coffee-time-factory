@@ -1,6 +1,6 @@
 ### 新しい最終目標
 
-最終目標を「**ロボットアーム (robot_arm) を1個クラフトする**」に変更します。
+最終目標を「**ロボット (robot) を100個インベントリに入れる**」に変更します。
 
 ### 1. 資源 (Resources) - マップから直接採掘
 
@@ -19,10 +19,11 @@
     *   `glass` (ガラス) - **NEW**
     *   `plastic` (プラスチック) - **NEW**
 *   **中間素材:**
-    *   `electronic_circuit` (電子基板)
+    *   `electronic_circuit` (電子基板) - **NEW**
     *   `advanced_processor` (高度プロセッサ) - **NEW**
+    *   `robot_body` (ロボットボディ) - **NEW**
 *   **最終目標アイテム:**
-    *   `robot_arm` (ロボットアーム) - **NEW**
+    *   `robot` (ロボット) - **NEW**
 
 ### 3. レシピ (Recipes)
 
@@ -35,9 +36,10 @@
 #### 組立機 (Assembler) レシピ
 *   **銅線:** `copper_plate` (1) → `copper_wire` (2) / `crafting_time`: 0.5秒
 *   **歯車:** `iron_plate` (2) → `gear` (1) / `crafting_time`: 0.5秒 - **NEW**
-*   **電子基板:** `iron_plate` (1) + `copper_wire` (3) → `electronic_circuit` (1) / `crafting_time`: 1秒
+*   **電子基板:** `iron_plate` (1) + `copper_wire` (3) → `electronic_circuit` (1) / `crafting_time`: 1秒 - **NEW**
 *   **高度プロセッサ:** `electronic_circuit` (2) + `glass` (1) + `plastic` (1) → `advanced_processor` (1) / `crafting_time`: 3秒 - **NEW**
-*   **ロボットアーム:** `advanced_processor` (1) + `gear` (3) + `iron_plate` (5) → `robot_arm` (1) / `crafting_time`: 4秒 - **NEW**
+*   **ロボットボディ:** `advanced_processor` (1) + `gear` (3) + `iron_plate` (5) → `robot_body` (1) / `crafting_time`: 4秒 - **NEW**
+*   **ロボット:** `robot_body` (1) + `electronic_circuit` (2) + `advanced_processor` (1) → `robot` (1) / `crafting_time`: 5秒 - **NEW**
 
 ### 4. 施設 (Buildings) - すべて `1x1` サイズ
 
@@ -82,10 +84,11 @@ graph TD
     subgraph Intermediate Products
         electronic_circuit[電子基板]
         advanced_processor[高度プロセッサ]
+        robot_body[ロボットボディ]
     end
 
     subgraph Final Product
-        robot_arm[ロボットアーム]
+        robot[ロボット]
     end
 
     subgraph Buildings
@@ -128,7 +131,10 @@ graph TD
     assembler --> advanced_processor
 
     advanced_processor + gear + iron_plate --> assembler
-    assembler --> robot_arm
+    assembler --> robot_body
+
+    robot_body + electronic_circuit + advanced_processor --> assembler
+    assembler --> robot
 
     %% Building Costs
     iron_plate -- 2個, copper_plate -- 1個 --> miner

@@ -1,5 +1,5 @@
 // js/game.js
-import { Miner, Furnace, ConveyorBelt, Item, Assembler, StorageChest, Splitter } from './entities.js';
+import { Miner, Furnace, ConveyorBelt, Item, Assembler, StorageChest, Splitter, ShippingTerminal } from './entities.js';
 import { RECIPES, BUILDING_COSTS } from './recipes.js'; // RECIPESとBUILDING_COSTSをインポート
 
 export class Game {
@@ -16,8 +16,15 @@ export class Game {
         this.currentBuildingDirection = 'north'; // 建設中の施設の向き
 
         this.goalItemCount = 0; // 最終目標アイテムの生産数を追跡
-        this.goal = { type: 'robot_arm', targetCount: 100 }; // 新しい目標
+        this.goal = { type: 'robot', targetCount: 10 }; // 新しい目標
         this.isGameOver = false; // ゲームオーバーフラグを追加
+        this.playerInventoryItemCapacity = 100; // プレイヤーインベントリの各アイテムの容量
+
+        this.robotProductionCount = 0; // ロボットの総生産数
+        this.lastRobotProductionTime = 0; // 最後のロボット生産時刻
+        this.robotProductionRate = 0; // 単位時間あたりのロボット生産個数
+        this.totalRobotsShipped = 0; // 出荷されたロボットの総数
+        this.allConveyorItems = []; // すべてのコンベア上のアイテムを保持
 
         this.initializeResources(); // 資源を初期配置
 
@@ -46,29 +53,27 @@ export class Game {
 
     initializeResources() {
         // 鉄鉱石の配置
-        this.grid[5][5].resource = { type: 'iron_ore', amount: 1000 };
-        this.grid[5][6].resource = { type: 'iron_ore', amount: 1000 };
-        this.grid[6][5].resource = { type: 'iron_ore', amount: 1000 };
-        this.grid[6][6].resource = { type: 'iron_ore', amount: 1000 };
+        this.grid[5][5].resource = { type: 'iron_ore' };
+        this.grid[5][6].resource = { type: 'iron_ore' };
+        this.grid[6][5].resource = { type: 'iron_ore' };
+        this.grid[6][6].resource = { type: 'iron_ore' };
 
         // 銅鉱石の配置
-        this.grid[8][15].resource = { type: 'copper_ore', amount: 800 };
-        this.grid[9][15].resource = { type: 'copper_ore', amount: 800 };
+        this.grid[8][15].resource = { type: 'copper_ore' };
+        this.grid[9][15].resource = { type: 'copper_ore' };
 
         // 石炭の配置
-        this.grid[12][3].resource = { type: 'coal', amount: 1200 };
-        this.grid[12][4].resource = { type: 'coal', amount: 1200 };
-        this.grid[13][3].resource = { type: 'coal', amount: 1200 }; // 追加
-        this.grid[13][4].resource = { type: 'coal', amount: 1200 }; // 追加
+        this.grid[12][3].resource = { type: 'coal' };
+        this.grid[12][4].resource = { type: 'coal' };
+        this.grid[13][3].resource = { type: 'coal' }; // 追加
+        this.grid[13][4].resource = { type: 'coal' }; // 追加
 
         // 石英鉱石の配置
-        this.grid[2][10].resource = { type: 'quartz_ore', amount: 1000 };
-        this.grid[2][11].resource = { type: 'quartz_ore', amount: 1000 };
+        this.grid[2][10].resource = { type: 'quartz_ore' };
+        this.grid[2][11].resource = { type: 'quartz_ore' };
     }
 
     update(deltaTime) {
-        if (this.isGameOver) return; // ゲームオーバーなら更新しない
-
         this.time = Math.max(0, this.time - deltaTime);
 
         // 各施設の更新
@@ -177,23 +182,23 @@ export class Game {
                                     } else if (nextTile.building instanceof Splitter) { // 次のタイルがSplitterの場合
                                         if (nextTile.building.inputInventory.length < nextTile.building.inputInventoryCapacity) {
                                             nextTile.building.inputInventory.push(item); // Splitterのインベントリへ
-                                            conveyor.items.splice(i, 1); // 現在のコンベアから削除
+                                            conveyor.items.splice(i, 1); // 現在のコンveyaから削除
                                         } else {
                                             item.position = 0.99; // Splitterが満杯
+                                        }
+                                    } else if (nextTile.building instanceof ShippingTerminal) { // 次のタイルがShippingTerminalの場合
+                                        if (item.type === 'robot' && nextTile.building.inputInventory.length < nextTile.building.inputInventoryCapacity) {
+                                            nextTile.building.inputInventory.push(item); // ShippingTerminalのインベントリへ
+                                            conveyor.items.splice(i, 1); // 現在のコンベアから削除
+                                        } else {
+                                            item.position = 0.99; // ShippingTerminalが満杯、またはロボットではない
                                         }
                                     } else {
                                         // 搬入先がない場合、アイテムはコンベアの終端で停止
                                         item.position = 0.99;
                                     }
-                                } else if (nextTile.building instanceof StorageChest) { // 次のタイルがStorageChestの場合
-                                    if (nextTile.building.inputInventory.length < nextTile.building.inputInventoryCapacity) {
-                                        nextTile.building.inputInventory.push(item); // StorageChestのインベントリへ
-                                        conveyor.items.splice(i, 1); // 現在のコンベアから削除
-                                    } else {
-                                        item.position = 0.99; // StorageChestが満杯
-                                    }
                                 } else {
-                                    // 次のタイルが何もない場合、アイテムはコンベアの終端で停止
+                                    // マップ外の場合、アイテムはコンベアの終端で停止
                                     item.position = 0.99;
                                 }
                             } else {
@@ -207,9 +212,9 @@ export class Game {
         }
 
         // 最終目標の達成判定
-        if (this.inventory[this.goal.type] && this.inventory[this.goal.type] >= this.goal.targetCount) {
+        if (this.inventory[this.goal.type] && this.inventory[this.goal.type] >= this.goal.targetCount && !this.isGameOver) {
             this.addLog(`ゲームクリア！ ${this.goal.type}を${this.goal.targetCount}個インベントリに入れました！`);
-            this.isGameOver = true; // ゲームを停止
+            this.isGameOver = true; // ゲームクリア状態を記録するが、ゲームは停止しない
         }
     }
 
@@ -277,6 +282,9 @@ export class Game {
                 break;
             case 'splitter': // Splitterのケースを追加
                 newBuilding = new Splitter(x, y, direction);
+                break;
+            case 'shipping_terminal': // ShippingTerminalのケースを追加
+                newBuilding = new ShippingTerminal(x, y, direction);
                 break;
             default:
                 this.addLog("不明な施設タイプです。");
@@ -352,12 +360,18 @@ export class Game {
 
     // インベントリにアイテムを追加するヘルパーメソッド
     addItemToInventory(itemType, count = 1) {
-        if (this.inventory[itemType]) {
-            this.inventory[itemType] += count;
-        } else {
-            this.inventory[itemType] = count;
+        if (!this.inventory[itemType]) {
+            this.inventory[itemType] = 0;
         }
+
+        if (this.inventory[itemType] + count > this.playerInventoryItemCapacity) {
+            this.addLog(`${itemType}のインベントリが満杯です。${itemType}を${count}個追加できませんでした。`);
+            return false;
+        }
+
+        this.inventory[itemType] += count;
         this.addLog(`${itemType}を${count}個インベントリに追加しました。`);
+        return true;
     }
 
     // 施設からアイテムを回収するメソッド
@@ -373,7 +387,7 @@ export class Game {
         let collectedCount = 0;
         let collectedItemType = '';
 
-        // Miner, Furnace, Assemblerからアイテムを回収
+        // Miner, Furnace, Assembler, StorageChestからアイテムを回収
         if (building.outputInventory && building.outputInventory.length > 0) {
             while (building.outputInventory.length > 0) {
                 const item = building.outputInventory.shift();
@@ -381,16 +395,36 @@ export class Game {
                 collectedItemType = item.type;
                 collectedCount++;
             }
-        } else if (building.inputInventory instanceof Map) { // Furnace, Assemblerの場合
-            if (building.inputInventory.size > 0) {
-                for (const [type, count] of building.inputInventory) {
-                    for (let i = 0; i < count; i++) {
-                        this.addItemToInventory(type, 1);
-                        collectedItemType = type;
-                        collectedCount++;
+        } else if (building.inputInventory) { // inputInventoryが存在する場合
+            if (building.inputInventory instanceof Map) { // Furnace, Assemblerの場合
+                if (building.inputInventory.size > 0) {
+                    for (const [type, count] of building.inputInventory) {
+                        for (let i = 0; i < count; i++) {
+                            if (this.addItemToInventory(type, 1)) { // 容量チェック
+                                collectedItemType = type;
+                                collectedCount++;
+                            } else {
+                                // インベントリが満杯で追加できなかった場合、ループを抜ける
+                                break;
+                            }
+                        }
+                        if (collectedCount > 0) { // 一部でも回収できたらクリア
+                            building.inputInventory.delete(type);
+                        }
                     }
                 }
-                building.inputInventory.clear();
+            } else if (building.inputInventory.length > 0) { // StorageChestの場合 (配列)
+                while (building.inputInventory.length > 0) {
+                    const item = building.inputInventory[0]; // shiftせずにチェック
+                    if (this.addItemToInventory(item.type, 1)) { // 容量チェック
+                        building.inputInventory.shift();
+                        collectedItemType = item.type;
+                        collectedCount++;
+                    } else {
+                        // インベントリが満杯で追加できなかった場合、ループを抜ける
+                        break;
+                    }
+                }
             }
         }
 
@@ -404,13 +438,10 @@ export class Game {
     mineResource(x, y) {
         if (x < 0 || x >= this.gridWidth || y < 0 || y >= this.gridHeight) return;
         const tile = this.grid[y][x];
-        if (tile.resource && tile.resource.amount > 0) {
+        if (tile.resource) {
             const minedItemType = tile.resource.type;
             this.addItemToInventory(minedItemType, 1);
-            tile.resource.amount--;
             this.addLog(`${minedItemType}を1個手動で採掘しました。`);
-        } else if (tile.resource && tile.resource.amount === 0) {
-            this.addLog("資源が枯渇しました。");
         }
     }
 

@@ -1,5 +1,5 @@
 // js/renderer.js
-import { Splitter } from './entities.js';
+import { Splitter, ShippingTerminal, ConveyorBelt } from './entities.js';
 import { getItemColor } from './utils.js';
 export class Renderer {
     constructor(canvas, game, tileSize) {
@@ -51,13 +51,9 @@ export class Renderer {
                 if (tile.resource) {
                     this.ctx.fillStyle = getItemColor(tile.resource.type);
                     this.ctx.beginPath();
-                    this.ctx.arc(x * this.tileSize + this.tileSize / 2, y * this.tileSize + this.tileSize / 2, this.tileSize / 3, 0, Math.PI * 2);
+                    this.ctx.arc(x * this.tileSize + this.tileSize / 2, y * this.tileSize + this.tileSize / 2, this.tileSize / 8, 0, Math.PI * 2); // 半径を tileSize / 8 に変更
                     this.ctx.fill();
-                    // 資源の残量表示 (デバッグ用)
-                    this.ctx.fillStyle = 'white';
-                    this.ctx.font = '8px Arial';
-                    this.ctx.textAlign = 'center';
-                    this.ctx.fillText(tile.resource.amount, x * this.tileSize + this.tileSize / 2, y * this.tileSize + this.tileSize / 2 + 3);
+                    // 資源の残量表示 (デバッグ用) は削除
                 }
             }
         }
@@ -67,7 +63,13 @@ export class Renderer {
 
         // UI情報の更新 (DOM操作)
         document.getElementById('time-display').textContent = `時間: ${Math.floor(game.time / 60).toString().padStart(2, '0')}:${Math.floor(game.time % 60).toString().padStart(2, '0')}`;
-        document.getElementById('goal-display').textContent = `目標: ${game.goal.type}を${game.goal.targetCount}個インベントリに入れる (${game.goalItemCount}/${game.goal.targetCount})`;
+        const goalDisplay = document.getElementById('goal-display');
+        if (game.isGameOver) {
+            goalDisplay.textContent = `ロボット生産レート: ${game.robotProductionRate.toFixed(2)}個/秒`;
+        } else {
+            goalDisplay.textContent = `目標: ${game.goal.type}を${game.goal.targetCount}個インベントリに入れる (${game.goalItemCount}/${game.goal.targetCount})`;
+        }
+        document.getElementById('shipped-robots-display').textContent = `出荷ロボット数: ${game.totalRobotsShipped}`;
         document.getElementById('log-display').innerHTML = game.log.slice().reverse().map(msg => `<div>${msg}</div>`).join('');
 
         // インベントリ表示
@@ -79,6 +81,42 @@ export class Renderer {
             }
         }
         inventoryDisplay.innerHTML = inventoryHtml;
+
+        // 4. ベルトコンベア上のアイテムの描画
+        for (let y = 0; y < game.gridHeight; y++) {
+            for (let x = 0; x < game.gridWidth; x++) {
+                const tile = game.grid[y][x];
+                if (tile.building instanceof ConveyorBelt) {
+                    const conveyor = tile.building;
+                    conveyor.items.forEach(item => {
+                        const itemX = conveyor.x * this.tileSize;
+                        const itemY = conveyor.y * this.tileSize;
+                        const itemSize = this.tileSize / 2;
+
+                        let drawX = itemX;
+                        let drawY = itemY;
+
+                        // アイテムの相対位置に基づいて描画位置を調整
+                        if (conveyor.direction === 'north') {
+                            drawY = itemY + this.tileSize - (item.position * this.tileSize) - itemSize / 2;
+                            drawX = itemX + this.tileSize / 2 - itemSize / 2;
+                        } else if (conveyor.direction === 'east') {
+                            drawX = itemX + (item.position * this.tileSize) - itemSize / 2;
+                            drawY = itemY + this.tileSize / 2 - itemSize / 2;
+                        } else if (conveyor.direction === 'south') {
+                            drawY = itemY + (item.position * this.tileSize) - itemSize / 2;
+                            drawX = itemX + this.tileSize / 2 - itemSize / 2;
+                        } else if (conveyor.direction === 'west') {
+                            drawX = itemX + this.tileSize - (item.position * this.tileSize) - itemSize / 2;
+                            drawY = itemY + this.tileSize / 2 - itemSize / 2;
+                        }
+
+                        this.ctx.fillStyle = getItemColor(item.type);
+                        this.ctx.fillRect(drawX, drawY, itemSize, itemSize);
+                    });
+                }
+            }
+        }
     }
 
     _getItemJapaneseName(itemType) {
@@ -95,9 +133,11 @@ export class Renderer {
             case 'plastic': return 'プラスチック';
             case 'electronic_circuit': return '電子基板';
             case 'advanced_processor': return '高度プロセッサ';
-            case 'robot_arm': return 'ロボットアーム';
+            case 'robot_body': return 'ロボットボディ';
+            case 'robot': return 'ロボット';
             case 'storage_chest': return 'ストレージチェスト';
             case 'splitter': return '分配器';
+            case 'shipping_terminal': return '出荷ターミナル';
             default: return itemType;
         }
     }
@@ -186,11 +226,27 @@ export class Renderer {
             info += `アイテム: ${building.items.map(item => this._getItemJapaneseName(item.type)).join(', ')}\n`;
         }
 
+        // ShippingTerminalの入力インベントリ
+        if (building instanceof ShippingTerminal) {
+            if (building.inputInventory.length > 0) {
+                const counts = {};
+                building.inputInventory.forEach(item => {
+                    counts[item.type] = (counts[item.type] || 0) + 1;
+                });
+                info += `入力 (${building.inputInventoryCapacity}): ${building.inputInventory.length}/${building.inputInventoryCapacity}\n`;
+                for (const type in counts) {
+                    info += `  ${this._getItemJapaneseName(type)}: ${counts[type]}\n`;
+                }
+            } else {
+                info += `入力 (${building.inputInventoryCapacity}): (空)\n`;
+            }
+        }
+
         return info;
     }
 
     // 資源の説明文を生成
     getResourceInfo(resource) {
-        return `資源: ${this._getItemJapaneseName(resource.type)}\n残量: ${resource.amount}`;
+        return `資源: ${this._getItemJapaneseName(resource.type)}`;
     }
 }

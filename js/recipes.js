@@ -1,7 +1,6 @@
+// js/recipes.js
 import { getItemColor } from './utils.js';
 import { getJapaneseBuildingType } from './main.js';
-
-// js/recipes.js
 
 export const RECIPES = {
     furnace: [
@@ -19,13 +18,13 @@ export const RECIPES = {
         },
         {
             name: "ガラス",
-            input: [{ type: 'quartz_ore', amount: 2 }, { type: 'coal', amount: 2 }], // 材料の石炭を1個から2個に調整
+            input: [{ type: 'quartz_ore', amount: 2 }, { type: 'coal', amount: 2 }],
             output: [{ type: 'glass', amount: 1 }],
             crafting_time: 1.5
         },
         {
             name: "プラスチック",
-            input: [{ type: 'coal', amount: 4 }], // 材料の石炭を3個から4個に調整
+            input: [{ type: 'coal', amount: 4 }],
             output: [{ type: 'plastic', amount: 1 }],
             crafting_time: 2
         }
@@ -56,10 +55,16 @@ export const RECIPES = {
             crafting_time: 3
         },
         {
-            name: "ロボットアーム",
+            name: "ロボットボディ",
             input: [{ type: 'advanced_processor', amount: 1 }, { type: 'gear', amount: 3 }, { type: 'iron_plate', amount: 5 }],
-            output: [{ type: 'robot_arm', amount: 1 }],
+            output: [{ type: 'robot_body', amount: 1 }],
             crafting_time: 4
+        },
+        {
+            name: "ロボット",
+            input: [{ type: 'robot_body', amount: 1 }, { type: 'electronic_circuit', amount: 2 }, { type: 'advanced_processor', amount: 1 }],
+            output: [{ type: 'robot', amount: 1 }],
+            crafting_time: 5
         }
     ]
 };
@@ -70,7 +75,8 @@ export const BUILDING_COSTS = {
     conveyor: [{ type: 'iron_plate', amount: 1 }],
     assembler: [{ type: 'iron_plate', amount: 5 }],
     storage_chest: [{ type: 'iron_plate', amount: 2 }, { type: 'plastic', amount: 1 }],
-    splitter: [{ type: 'iron_plate', amount: 3 }, { type: 'copper_plate', amount: 1 }]
+    splitter: [{ type: 'iron_plate', amount: 3 }, { type: 'copper_plate', amount: 1 }],
+    shipping_terminal: [] // コストなし
 };
 
 // レシピ情報を整形して返すヘルパーメソッド
@@ -79,21 +85,21 @@ export function getFormattedRecipes(getItemJapaneseName) {
 
     formattedText += '<div class="cheat-sheet-category">--- かまど (Furnace) レシピ ---</div>';
     RECIPES.furnace.forEach(recipe => {
-        const input = recipe.input.map(i => `${getItemJapaneseName(i.type)}<span style="background-color: ${getItemColor(i.type)};" class="item-color-icon"></span>x${i.amount}`).join(' + ');
-        const output = recipe.output.map(o => `${getItemJapaneseName(o.type)}<span style="background-color: ${getItemColor(o.type)};" class="item-color-icon"></span>x${o.amount}`).join(' + ');
+        const input = recipe.input.map(i => `${getItemJapaneseName(i.type)} <span style="background-color: ${getItemColor(i.type)};" class="item-color-icon"></span>x${i.amount}`).join(' + ');
+        const output = recipe.output.map(o => `${getItemJapaneseName(o.type)} <span style="background-color: ${getItemColor(o.type)};" class="item-color-icon"></span>x${o.amount}`).join(' + ');
         formattedText += `<div class="cheat-sheet-recipe">${input} → ${output} (時間: ${recipe.crafting_time}秒)</div>`;
     });
 
     formattedText += '<div class="cheat-sheet-category">--- 組立機 (Assembler) レシピ ---</div>';
     RECIPES.assembler.forEach(recipe => {
-        const input = recipe.input.map(i => `${getItemJapaneseName(i.type)}<span style="background-color: ${getItemColor(i.type)};" class="item-color-icon"></span>x${i.amount}`).join(' + ');
-        const output = recipe.output.map(o => `${getItemJapaneseName(o.type)}<span style="background-color: ${getItemColor(o.type)};" class="item-color-icon"></span>x${o.amount}`).join(' + ');
+        const input = recipe.input.map(i => `${getItemJapaneseName(i.type)} <span style="background-color: ${getItemColor(i.type)};" class="item-color-icon"></span>x${i.amount}`).join(' + ');
+        const output = recipe.output.map(o => `${getItemJapaneseName(o.type)} <span style="background-color: ${getItemColor(o.type)};" class="item-color-icon"></span>x${o.amount}`).join(' + ');
         formattedText += `<div class="cheat-sheet-recipe">${input} → ${output} (時間: ${recipe.crafting_time}秒)</div>`;
     });
 
     formattedText += '<div class="cheat-sheet-category">--- 施設クラフトコスト ---</div>';
     for (const buildingType in BUILDING_COSTS) {
-        const costs = BUILDING_COSTS[buildingType].map(c => `${getItemJapaneseName(c.type)}<span style="background-color: ${getItemColor(c.type)};" class="item-color-icon"></span>x${c.amount}`).join(' + ');
+        const costs = BUILDING_COSTS[buildingType].map(c => `${getItemJapaneseName(c.type)} <span style="background-color: ${getItemColor(c.type)};" class="item-color-icon"></span>x${c.amount}`).join(' + ');
         formattedText += `<div class="cheat-sheet-recipe">${getJapaneseBuildingType(buildingType)}: ${costs}</div>`;
     }
 

@@ -73,13 +73,13 @@ export class Miner extends Building {
             return;
         }
 
-        if (tile.resource && tile.resource.amount > 0) {
+        if (tile.resource) { // amountチェックを削除
             this.miningProgress += deltaTime;
             if (this.miningProgress >= this.miningSpeed) {
                 // 1個採掘
                 const minedItemType = tile.resource.type;
                 this.outputInventory.push({ type: minedItemType });
-                tile.resource.amount--;
+                // tile.resource.amount--; // amountの減少を削除
                 this.miningProgress = 0;
                 game.addLog(`${minedItemType}を1個採掘しました。`);
             }
@@ -179,33 +179,7 @@ export class ConveyorBelt extends Building {
         // 向きを示す矢印
         super._drawDirectionArrow(ctx, tileSize, this.direction, 'lightgray');
 
-        // アイテムの描画 (game.jsで管理されるitems配列から描画)
-        this.items.forEach(item => {
-            const itemX = this.x * tileSize;
-            const itemY = this.y * tileSize;
-            const itemSize = tileSize / 2;
-
-            let drawX = itemX;
-            let drawY = itemY;
-
-            // アイテムの相対位置に基づいて描画位置を調整
-            if (this.direction === 'north') {
-                drawY = itemY + tileSize - (item.position * tileSize) - itemSize / 2;
-                drawX = itemX + tileSize / 2 - itemSize / 2;
-            } else if (this.direction === 'east') {
-                drawX = itemX + (item.position * tileSize) - itemSize / 2;
-                drawY = itemY + tileSize / 2 - itemSize / 2;
-            } else if (this.direction === 'south') {
-                drawY = itemY + (item.position * tileSize) - itemSize / 2;
-                drawX = itemX + tileSize / 2 - itemSize / 2;
-            } else if (this.direction === 'west') {
-                drawX = itemX + tileSize - (item.position * tileSize) - itemSize / 2;
-                drawY = itemY + tileSize / 2 - itemSize / 2;
-            }
-
-            ctx.fillStyle = getItemColor(item.type);
-            ctx.fillRect(drawX, drawY, itemSize, itemSize);
-        });
+        // アイテムの描画はRendererで一括管理するため削除
     }
 }
 
@@ -254,6 +228,20 @@ export class Assembler extends Building {
                         if (out.type === game.goal.type) {
                             game.goalItemCount++;
                         }
+                        // ロボットが作られたら生産レートを更新
+                        if (out.type === 'robot') {
+                            game.robotProductionCount++;
+                            const currentTime = game.time; // 現在のゲーム時間
+                            if (game.lastRobotProductionTime !== 0) {
+                                const timeElapsed = game.lastRobotProductionTime - currentTime;
+                                if (timeElapsed > 0) {
+                                    game.robotProductionRate = 1 / timeElapsed; // 1個あたりの時間からレートを計算
+                                } else {
+                                    game.robotProductionRate = Infinity; // 同時に複数生産された場合など
+                                }
+                            }
+                            game.lastRobotProductionTime = currentTime;
+                        }
                     }
                 });
                 this.craftingProgress = 0;
@@ -274,9 +262,12 @@ export class Assembler extends Building {
 }
 
 export class Item {
-    constructor(type, position = 0) {
+    constructor(type, position = 0, conveyorX = -1, conveyorY = -1, conveyorDirection = 'north') {
         this.type = type;
         this.position = position; // 0.0 (入口) から 1.0 (出口)
+        this.conveyorX = conveyorX;
+        this.conveyorY = conveyorY;
+        this.conveyorDirection = conveyorDirection;
     }
 }
 
@@ -285,28 +276,10 @@ export class StorageChest extends Building {
         super(x, y, 'storage_chest', 'north'); // 向きは関係ないのでnorthで固定
         this.inputInventory = []; // アイテムを貯蔵
         this.inputInventoryCapacity = 10; // ストレージチェストの容量
-        this.transferTimer = 0;
-        this.transferInterval = 1.0; // 1秒ごとに転送
     }
 
     update(deltaTime, game) {
-        this.transferTimer += deltaTime;
-
-        if (this.transferTimer >= this.transferInterval) {
-            this.transferTimer = 0;
-
-            if (this.inputInventory.length > 0) {
-                let collectedCount = 0;
-                let collectedItemType = '';
-                while (this.inputInventory.length > 0) {
-                    const item = this.inputInventory.shift();
-                    game.addItemToInventory(item.type, 1);
-                    collectedItemType = item.type;
-                    collectedCount++;
-                }
-                game.addLog(`${collectedItemType}を${collectedCount}個、ストレージチェストから自動回収しました。`);
-            }
-        }
+        // 特に自動的な処理はなし
     }
 
     draw(ctx, tileSize) {
@@ -403,5 +376,49 @@ export class Splitter extends Building {
         }
         ctx.closePath();
         ctx.fill();
+    }
+}
+
+export class ShippingTerminal extends Building {
+    constructor(x, y, direction = 'north') {
+        super(x, y, 'shipping_terminal', direction);
+        this.inputInventory = [];
+        this.inputInventoryCapacity = 5;
+        this.shippingTimer = 0;
+        this.shippingInterval = 0.1; // 0.1秒ごとに1個出荷
+    }
+
+    update(deltaTime, game) {
+        this.shippingTimer += deltaTime;
+
+        if (this.shippingTimer >= this.shippingInterval) {
+            this.shippingTimer = 0;
+
+            if (this.inputInventory.length > 0) {
+                const itemToShip = this.inputInventory[0];
+                if (itemToShip.type === 'robot') {
+                    this.inputInventory.shift(); // アイテムを消費
+                    game.totalRobotsShipped++; // 出荷数をカウント
+                    game.addLog(`ロボットを1個出荷しました。総出荷数: ${game.totalRobotsShipped}`);
+                }
+            }
+        }
+    }
+
+    draw(ctx, tileSize) {
+        ctx.fillStyle = '#4682B4'; // 出荷ターミナルの色
+        ctx.fillRect(this.x * tileSize, this.y * tileSize, tileSize, tileSize);
+        ctx.strokeStyle = 'white';
+        ctx.strokeRect(this.x * tileSize, this.y * tileSize, tileSize, tileSize);
+
+        // 向きを示す矢印
+        super._drawDirectionArrow(ctx, tileSize, this.direction, '#ADD8E6');
+
+        // 出荷アイコン (簡易版)
+        ctx.fillStyle = 'white';
+        ctx.font = `${tileSize / 2}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('SHIP', this.x * tileSize + tileSize / 2, this.y * tileSize + tileSize / 2);
     }
 }

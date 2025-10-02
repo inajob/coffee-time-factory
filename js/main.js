@@ -1,7 +1,7 @@
 // js/main.js
 import { Game } from './game.js';
 import { Renderer } from './renderer.js';
-import { Miner, Furnace, ConveyorBelt, Assembler, StorageChest, Splitter } from './entities.js';
+import { Miner, Furnace, ConveyorBelt, Assembler, StorageChest, Splitter, ShippingTerminal } from './entities.js';
 import { RECIPES, getFormattedRecipes } from './recipes.js'; // RECIPESとgetFormattedRecipesをインポート
 
 // ゲーム設定
@@ -34,6 +34,7 @@ export function getJapaneseBuildingType(type) {
         case 'assembler': return '組立機';
         case 'storage_chest': return 'ストレージチェスト';
         case 'splitter': return '分配器';
+        case 'shipping_terminal': return '出荷ターミナル';
         default: return type;
     }
 }
@@ -124,6 +125,12 @@ document.addEventListener('keydown', (e) => {
             currentBuildingType = 'splitter';
             currentMode = 'build';
             game.addLog('建設モード: 分配器');
+            updateModeDisplay();
+            break;
+        case '7': // 出荷ターミナル建設モード
+            currentBuildingType = 'shipping_terminal';
+            currentMode = 'build';
+            game.addLog('建設モード: 出荷ターミナル');
             updateModeDisplay();
             break;
         case 'r': // 建設中の施設を回転
