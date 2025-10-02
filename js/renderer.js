@@ -152,94 +152,23 @@ export class Renderer {
 
         // 入力インベントリ
         if (building.inputInventory) {
-            if (building.inputInventory instanceof Map) { // Furnace, Assemblerの場合
-                info += `入力 (${building.inputInventoryCapacity}):\n`;
-                if (building.inputInventory.size === 0) {
-                    info += `  (空)\n`;
-                } else {
-                    building.inputInventory.forEach((count, type) => {
-                        info += `  ${this._getItemJapaneseName(type)}: ${count}/${building.inputInventoryCapacity}\n`;
-                    });
-                }
-            } else if (Array.isArray(building.inputInventory)) { // 配列の場合 (StorageChest, Splitter, ShippingTerminal)
-                info += `入力 (${building.inputInventoryCapacity}): ${building.inputInventory.length}/${building.inputInventoryCapacity}\n`;
-                if (building.inputInventory.length > 0) {
-                    const counts = {};
-                    building.inputInventory.forEach(item => {
-                        counts[item.type] = (counts[item.type] || 0) + 1;
-                    });
-                    for (const type in counts) {
-                        info += `  ${this._getItemJapaneseName(type)}: ${counts[type]}\n`;
-                    }
-                } else {
-                    info += `  (空)\n`;
-                }
-            }
+            info += this._formatInventoryInfo(building.inputInventory, building.inputInventoryCapacity, '入力');
         }
 
         // 出力インベントリ
         if (building.outputInventory && building.outputInventory.length !== undefined) {
-            info += `出力 (${building.outputInventoryCapacity}): ${building.outputInventory.length}/${building.outputInventoryCapacity}\n`;
-            if (building.outputInventory.length > 0) {
-                const counts = {};
-                building.outputInventory.forEach(item => {
-                    counts[item.type] = (counts[item.type] || 0) + 1;
-                });
-                for (const type in counts) {
-                    info += `  ${this._getItemJapaneseName(type)}: ${counts[type]}\n`;
-                }
-            } else {
-                info += `  (空)\n`;
-            }
+            info += this._formatInventoryInfo(building.outputInventory, building.outputInventoryCapacity, '出力');
         }
 
         // Splitterの出力インベントリ
         if (building instanceof Splitter) {
-            if (building.outputInventory1.length > 0) {
-                const counts = {};
-                building.outputInventory1.forEach(item => {
-                    counts[item.type] = (counts[item.type] || 0) + 1;
-                });
-                info += `出力1 (${building.outputInventoryCapacity}): ${building.outputInventory1.length}/${building.outputInventoryCapacity}\n`;
-                for (const type in counts) {
-                    info += `  ${this._getItemJapaneseName(type)}: ${counts[type]}\n`;
-                }
-            } else {
-                info += `出力1 (${building.outputInventoryCapacity}): (空)\n`;
-            }
-            if (building.outputInventory2.length > 0) {
-                const counts = {};
-                building.outputInventory2.forEach(item => {
-                    counts[item.type] = (counts[item.type] || 0) + 1;
-                });
-                info += `出力2 (${building.outputInventoryCapacity}): ${building.outputInventory2.length}/${building.outputInventoryCapacity}\n`;
-                for (const type in counts) {
-                    info += `  ${this._getItemJapaneseName(type)}: ${counts[type]}\n`;
-                }
-            } else {
-                info += `出力2 (${building.outputInventoryCapacity}): (空)\n`;
-            }
-        }
-
-        // コンベア上のアイテム (ConveyorBeltのみ)
-        if (building.type === 'conveyor' && building.items.length > 0) {
-            info += `アイテム: ${building.items.map(item => this._getItemJapaneseName(item.type)).join(', ')}\n`;
+            info += this._formatInventoryInfo(building.outputInventory1, building.outputInventoryCapacity, '出力1');
+            info += this._formatInventoryInfo(building.outputInventory2, building.outputInventoryCapacity, '出力2');
         }
 
         // ShippingTerminalの入力インベントリ
         if (building instanceof ShippingTerminal) {
-            if (building.inputInventory.length > 0) {
-                const counts = {};
-                building.inputInventory.forEach(item => {
-                    counts[item.type] = (counts[item.type] || 0) + 1;
-                });
-                info += `入力 (${building.inputInventoryCapacity}): ${building.inputInventory.length}/${building.inputInventoryCapacity}\n`;
-                for (const type in counts) {
-                    info += `  ${this._getItemJapaneseName(type)}: ${counts[type]}\n`;
-                }
-            } else {
-                info += `入力 (${building.inputInventoryCapacity}): (空)\n`;
-            }
+            info += this._formatInventoryInfo(building.inputInventory, building.inputInventoryCapacity, '入力');
         }
 
         return info;
@@ -248,5 +177,33 @@ export class Renderer {
     // 資源の説明文を生成
     getResourceInfo(resource) {
         return `資源: ${this._getItemJapaneseName(resource.type)}`;
+    }
+
+    // インベントリ情報を整形するヘルパーメソッド
+    _formatInventoryInfo(inventory, capacity, title) {
+        let infoText = `${title} (${capacity}):\n`;
+        if (inventory instanceof Map) {
+            if (inventory.size === 0) {
+                infoText += `  (空)\n`;
+            } else {
+                inventory.forEach((count, type) => {
+                    infoText += `  ${this._getItemJapaneseName(type)}: ${count}/${capacity}\n`;
+                });
+            }
+        } else if (Array.isArray(inventory)) {
+            infoText += `  ${inventory.length}/${capacity}\n`;
+            if (inventory.length > 0) {
+                const counts = {};
+                inventory.forEach(item => {
+                    counts[item.type] = (counts[item.type] || 0) + 1;
+                });
+                for (const type in counts) {
+                    infoText += `  ${this._getItemJapaneseName(type)}: ${counts[type]}\n`;
+                }
+            } else {
+                infoText += `  (空)\n`;
+            }
+        }
+        return infoText;
     }
 }
