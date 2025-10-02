@@ -88,9 +88,10 @@ export class Game {
                         const nextTile = this.getAdjacentTile(x, y, tile.building.direction);
                         if (nextTile && nextTile.building instanceof ConveyorBelt) {
                             const itemToMove = tile.building.outputInventory[0];
-                            if (nextTile.building.items.length < 2) {
-                                nextTile.building.items.push(new Item(itemToMove.type, 0));
-                                tile.building.outputInventory.shift();
+                            if (nextTile.building.items.length < 2) { // 簡易的に2個までとする
+                                const newItem = new Item(itemToMove.type, 0, tile.building.direction); // previousConveyorDirectionを設定
+                                nextTile.building.items.push(newItem); // コンベアの先頭に追加
+                                tile.building.outputInventory.shift(); // 施設からアイテムを削除
                             }
                         }
                     }
@@ -143,13 +144,14 @@ export class Game {
                             const nextTile = this.getAdjacentTile(x, y, conveyor.direction);
                             if (nextTile) {
                                 // 次のタイルがコンベアの場合
-                                if (nextTile.building instanceof ConveyorBelt) {
-                                    // 次のコンベアに空きがあるか、または詰まっていないか
-                                    if (nextTile.building.items.length < 2) { // 簡易的に2個までとする
-                                        // 超過分を次のコンベアのpositionに引き継ぐ
-                                        const newPosition = item.position - 1.0;
-                                        nextTile.building.items.push(new Item(item.type, newPosition));
-                                        conveyor.items.splice(i, 1); // 現在のコンベアから削除
+                                    if (nextTile.building instanceof ConveyorBelt) {
+                                        // 次のコンベアに空きがあるか、または詰まっていないか
+                                        if (nextTile.building.items.length < 2) { // 簡易的に2個までとする
+                                            // 超過分を次のコンベアのpositionに引き継ぐ
+                                            const newPosition = item.position - 1.0;
+                                            const newItem = new Item(item.type, newPosition, conveyor.direction); // previousConveyorDirectionを設定
+                                            nextTile.building.items.push(newItem);
+                                            conveyor.items.splice(i, 1); // 現在のコンベアから削除
                                     } else {
                                         // 次のコンベアが詰まっている場合、現在のコンベアの終端で停止
                                         item.position = 0.99; // 終端で停止

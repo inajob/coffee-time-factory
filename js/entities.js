@@ -262,12 +262,10 @@ export class Assembler extends Building {
 }
 
 export class Item {
-    constructor(type, position = 0, conveyorX = -1, conveyorY = -1, conveyorDirection = 'north') {
+    constructor(type, position = 0, previousConveyorDirection = 'north') {
         this.type = type;
         this.position = position; // 0.0 (入口) から 1.0 (出口)
-        this.conveyorX = conveyorX;
-        this.conveyorY = conveyorY;
-        this.conveyorDirection = conveyorDirection;
+        this.previousConveyorDirection = previousConveyorDirection;
     }
 }
 
