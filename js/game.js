@@ -154,48 +154,11 @@ export class Game {
                                         // 次のコンベアが詰まっている場合、現在のコンベアの終端で停止
                                         item.position = 0.99; // 終端で停止
                                     }
-                                } else if (nextTile.building) {
-                                    // Assemblerの場合、MapのinputInventoryへ、Furnaceの場合は配列のinputInventoryへ
-                                    if (nextTile.building instanceof Assembler) {
-                                        const currentAmount = nextTile.building.inputInventory.get(item.type) || 0;
-                                        if (currentAmount < nextTile.building.inputInventoryCapacity) {
-                                            nextTile.building.inputInventory.set(item.type, currentAmount + 1); // 入力インベントリへ
-                                            conveyor.items.splice(i, 1); // 現在のコンベアから削除
-                                        } else {
-                                            item.position = 0.99; // 入力インベントリが満杯
-                                        }
-                                    } else if (nextTile.building instanceof Furnace) { // Furnaceの場合 (MapのinputInventory)
-                                        const currentAmount = nextTile.building.inputInventory.get(item.type) || 0;
-                                        if (currentAmount < nextTile.building.inputInventoryCapacity) {
-                                            nextTile.building.inputInventory.set(item.type, currentAmount + 1); // 入力インベントリへ
-                                            conveyor.items.splice(i, 1); // 現在のコンベアから削除
-                                        } else {
-                                            item.position = 0.99; // 入力インベントリが満杯
-                                        }
-                                    } else if (nextTile.building instanceof StorageChest) { // StorageChestの場合 (配列のinputInventory)
-                                        if (nextTile.building.inputInventory.length < nextTile.building.inputInventoryCapacity) {
-                                            nextTile.building.inputInventory.push(item); // 入力インベントリへ
-                                            conveyor.items.splice(i, 1); // 現在のコンベアから削除
-                                        } else {
-                                            item.position = 0.99; // StorageChestが満杯
-                                        }
-                                    } else if (nextTile.building instanceof Splitter) { // 次のタイルがSplitterの場合
-                                        if (nextTile.building.inputInventory.length < nextTile.building.inputInventoryCapacity) {
-                                            nextTile.building.inputInventory.push(item); // Splitterのインベントリへ
-                                            conveyor.items.splice(i, 1); // 現在のコンveyaから削除
-                                        } else {
-                                            item.position = 0.99; // Splitterが満杯
-                                        }
-                                    } else if (nextTile.building instanceof ShippingTerminal) { // 次のタイルがShippingTerminalの場合
-                                        if (item.type === 'robot' && nextTile.building.inputInventory.length < nextTile.building.inputInventoryCapacity) {
-                                            nextTile.building.inputInventory.push(item); // ShippingTerminalのインベントリへ
-                                            conveyor.items.splice(i, 1); // 現在のコンベアから削除
-                                        } else {
-                                            item.position = 0.99; // ShippingTerminalが満杯、またはロボットではない
-                                        }
+                                } else if (nextTile.building) { // 次のタイルが施設の場合
+                                    if (this._tryAddItemToBuildingInput(nextTile.building, item)) {
+                                        conveyor.items.splice(i, 1); // 現在のコンベアから削除
                                     } else {
-                                        // 搬入先がない場合、アイテムはコンベアの終端で停止
-                                        item.position = 0.99;
+                                        item.position = 0.99; // 施設が満杯で追加できなかった場合、コンベアの終端で停止
                                     }
                                 } else {
                                     // マップ外の場合、アイテムはコンベアの終端で停止
@@ -458,5 +421,28 @@ export class Game {
             resource: tile.resource,
             building: tile.building
         };
+    }
+
+    // 施設へのアイテム搬入を試みる汎用メソッド
+    _tryAddItemToBuildingInput(building, item) {
+        if (!building.inputInventory) return false; // inputInventoryがない施設
+
+        if (building.inputInventory instanceof Map) { // Mapで管理するインベントリ (Furnace, Assembler)
+            const currentAmount = building.inputInventory.get(item.type) || 0;
+            if (currentAmount < building.inputInventoryCapacity) {
+                building.inputInventory.set(item.type, currentAmount + 1);
+                return true;
+            }
+        } else { // 配列で管理するインベントリ (StorageChest, Splitter, ShippingTerminal)
+            if (building.inputInventory.length < building.inputInventoryCapacity) {
+                // ShippingTerminalの場合、robot以外は受け入れない
+                if (building instanceof ShippingTerminal && item.type !== 'robot') {
+                    return false;
+                }
+                building.inputInventory.push(item);
+                return true;
+            }
+        }
+        return false;
     }
 }

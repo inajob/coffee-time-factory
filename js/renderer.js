@@ -152,7 +152,7 @@ export class Renderer {
 
         // 入力インベントリ
         if (building.inputInventory) {
-            if (building.inputInventory instanceof Map) {
+            if (building.inputInventory instanceof Map) { // Furnace, Assemblerの場合
                 info += `入力 (${building.inputInventoryCapacity}):\n`;
                 if (building.inputInventory.size === 0) {
                     info += `  (空)\n`;
@@ -161,7 +161,7 @@ export class Renderer {
                         info += `  ${this._getItemJapaneseName(type)}: ${count}/${building.inputInventoryCapacity}\n`;
                     });
                 }
-            } else if (building.inputInventory.length !== undefined) { // 配列の場合
+            } else if (Array.isArray(building.inputInventory)) { // 配列の場合 (StorageChest, Splitter, ShippingTerminal)
                 info += `入力 (${building.inputInventoryCapacity}): ${building.inputInventory.length}/${building.inputInventoryCapacity}\n`;
                 if (building.inputInventory.length > 0) {
                     const counts = {};
