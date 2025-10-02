@@ -118,6 +118,39 @@ body {
     vertical-align: middle;
 }
 
+#control-panel {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 10px;
+    padding: 10px;
+    background-color: #333;
+    border: 2px solid #555;
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+    max-width: calc(100vw - 40px);
+    justify-content: center;
+}
+
+.control-button {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 5px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8em;
+    transition: background-color 0.2s;
+}
+
+.control-button:hover {
+    background-color: #0056b3;
+}
+
+.control-button.active {
+    background-color: #28a745;
+    box-shadow: 0 0 8px rgba(40, 167, 69, 0.7);
+}
+
 /* スマートフォン向けのメディアクエリ */
 @media (max-width: 768px) {
     #game-container {

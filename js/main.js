@@ -56,7 +56,7 @@ function updateModeDisplay() {
     if (currentMode === 'build') {
         const japaneseType = getJapaneseBuildingType(currentBuildingType);
         const directionArrow = getDirectionArrow(currentBuildingDirection);
-        buildingStatusElement.textContent = `建設中: ${japaneseType} (向き: ${directionArrow})`;
+        buildingStatusElement.textContent = `建設中: ${japaneseType} (${directionArrow})`;
         buildingStatusElement.style.display = 'block';
     } else if (currentMode === 'delete') {
         buildingStatusElement.textContent = `モード: 削除`;
@@ -64,6 +64,41 @@ function updateModeDisplay() {
     } else {
         buildingStatusElement.textContent = '';
         buildingStatusElement.style.display = 'none';
+    }
+}
+
+// モード設定関数
+function setBuildMode(type, buttonId) {
+    currentBuildingType = type;
+    currentMode = 'build';
+    game.addLog(`建設モード: ${getJapaneseBuildingType(type)}`);
+    updateModeDisplay();
+    setActiveButton(buttonId);
+}
+
+function setDeleteMode() {
+    currentMode = 'delete';
+    currentBuildingType = null; // 建設タイプはクリア
+    game.addLog('モード: 削除');
+    updateModeDisplay();
+    setActiveButton('delete-mode');
+}
+
+function setNormalMode() {
+    currentBuildingType = null;
+    currentMode = 'normal';
+    game.addLog('モードを解除しました。');
+    updateModeDisplay();
+    setActiveButton(null);
+}
+
+function rotateBuilding() {
+    if (currentMode === 'build') {
+        const directions = ['north', 'east', 'south', 'west'];
+        let currentIndex = directions.indexOf(currentBuildingDirection);
+        currentBuildingDirection = directions[(currentIndex + 1) % directions.length];
+        game.addLog(`建設中の施設の向きを${getDirectionArrow(currentBuildingDirection)}に回転`);
+        updateModeDisplay();
     }
 }
 
@@ -91,69 +126,16 @@ function gameLoop(currentTime) {
 // キーボード入力の処理
 document.addEventListener('keydown', (e) => {
     switch (e.key) {
-        case '1': // コンベア建設モード
-            currentBuildingType = 'conveyor';
-            currentMode = 'build';
-            game.addLog('建設モード: ベルトコンベア');
-            updateModeDisplay();
-            break;
-        case '2': // 採掘機建設モード
-            currentBuildingType = 'miner';
-            currentMode = 'build';
-            game.addLog('建設モード: 採掘機');
-            updateModeDisplay();
-            break;
-        case '3': // かまど建設モード
-            currentBuildingType = 'furnace';
-            currentMode = 'build';
-            game.addLog('建設モード: かまど');
-            updateModeDisplay();
-            break;
-        case '4': // 組立機建設モード
-            currentBuildingType = 'assembler';
-            currentMode = 'build';
-            game.addLog('建設モード: 組立機');
-            updateModeDisplay();
-            break;
-        case '5': // ストレージチェスト建設モード
-            currentBuildingType = 'storage_chest';
-            currentMode = 'build';
-            game.addLog('建設モード: ストレージチェスト');
-            updateModeDisplay();
-            break;
-        case '6': // 分配器建設モード
-            currentBuildingType = 'splitter';
-            currentMode = 'build';
-            game.addLog('建設モード: 分配器');
-            updateModeDisplay();
-            break;
-        case '7': // 出荷ターミナル建設モード
-            currentBuildingType = 'shipping_terminal';
-            currentMode = 'build';
-            game.addLog('建設モード: 出荷ターミナル');
-            updateModeDisplay();
-            break;
-        case 'r': // 建設中の施設を回転
-            if (currentMode === 'build') {
-                const directions = ['north', 'east', 'south', 'west'];
-                let currentIndex = directions.indexOf(currentBuildingDirection);
-                currentBuildingDirection = directions[(currentIndex + 1) % directions.length];
-                game.addLog(`建設中の施設の向きを${getDirectionArrow(currentBuildingDirection)}に回転`); // ログも日本語化
-                updateModeDisplay();
-            }
-            break;
-        case 'Escape': // モード解除
-            currentBuildingType = null;
-            currentMode = 'normal';
-            game.addLog('モードを解除しました。');
-            updateModeDisplay();
-            break;
-        case 'x': // 削除モード
-            currentMode = 'delete';
-            currentBuildingType = null; // 建設タイプはクリア
-            game.addLog('モード: 削除');
-            updateModeDisplay();
-            break;
+        case '1': setBuildMode('conveyor', 'build-conveyor'); break;
+        case '2': setBuildMode('miner', 'build-miner'); break;
+        case '3': setBuildMode('furnace', 'build-furnace'); break;
+        case '4': setBuildMode('assembler', 'build-assembler'); break;
+        case '5': setBuildMode('storage_chest', 'build-storage'); break;
+        case '6': setBuildMode('splitter', 'build-splitter'); break;
+        case '7': setBuildMode('shipping_terminal', 'build-shipping'); break;
+        case 'r': rotateBuilding(); break;
+        case 'Escape': setNormalMode(); break;
+        case 'x': setDeleteMode(); break;
     }
 });
 
@@ -318,6 +300,58 @@ updateModeDisplay();
 // チートシートの内容を生成して表示
 const cheatSheetContent = document.getElementById('cheat-sheet-content');
 cheatSheetContent.innerHTML = getFormattedRecipes(renderer._getItemJapaneseName.bind(renderer));
+
+// コントロールボタンのロジック
+const controlButtons = document.querySelectorAll('#control-panel .control-button');
+
+function setActiveButton(activeButtonId) {
+    controlButtons.forEach(button => {
+        button.classList.remove('active');
+    });
+    if (activeButtonId) {
+        document.getElementById(activeButtonId).classList.add('active');
+    }
+}
+
+document.getElementById('build-conveyor').addEventListener('click', () => {
+    setBuildMode('conveyor', 'build-conveyor');
+});
+
+document.getElementById('build-miner').addEventListener('click', () => {
+    setBuildMode('miner', 'build-miner');
+});
+
+document.getElementById('build-furnace').addEventListener('click', () => {
+    setBuildMode('furnace', 'build-furnace');
+});
+
+document.getElementById('build-assembler').addEventListener('click', () => {
+    setBuildMode('assembler', 'build-assembler');
+});
+
+document.getElementById('build-storage').addEventListener('click', () => {
+    setBuildMode('storage_chest', 'build-storage');
+});
+
+document.getElementById('build-splitter').addEventListener('click', () => {
+    setBuildMode('splitter', 'build-splitter');
+});
+
+document.getElementById('build-shipping').addEventListener('click', () => {
+    setBuildMode('shipping_terminal', 'build-shipping');
+});
+
+document.getElementById('rotate-building').addEventListener('click', () => {
+    rotateBuilding();
+});
+
+document.getElementById('delete-mode').addEventListener('click', () => {
+    setDeleteMode();
+});
+
+document.getElementById('normal-mode').addEventListener('click', () => {
+    setNormalMode();
+});
 
 // ゲームループ開始
 requestAnimationFrame(gameLoop);
