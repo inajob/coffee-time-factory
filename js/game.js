@@ -105,7 +105,8 @@ export class Game {
                             if (nextTile && nextTile.building instanceof ConveyorBelt) {
                                 const itemToMove = tile.building.outputInventory1[0];
                                 if (nextTile.building.items.length < 2) {
-                                    nextTile.building.items.push(new Item(itemToMove.type, 0));
+                                    // newItemのpreviousConveyorDirectionにoutput1Directionを設定
+                                    nextTile.building.items.push(new Item(itemToMove.type, 0, output1Direction)); // <-- ここを修正
                                     tile.building.outputInventory1.shift();
                                 }
                             }
@@ -118,7 +119,8 @@ export class Game {
                             if (nextTile && nextTile.building instanceof ConveyorBelt) {
                                 const itemToMove = tile.building.outputInventory2[0];
                                 if (nextTile.building.items.length < 2) {
-                                    nextTile.building.items.push(new Item(itemToMove.type, 0));
+                                    // newItemのpreviousConveyorDirectionにoutput2Directionを設定
+                                    nextTile.building.items.push(new Item(itemToMove.type, 0, output2Direction)); // <-- ここを修正
                                     tile.building.outputInventory2.shift();
                                 }
                             }
