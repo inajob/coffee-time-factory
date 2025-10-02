@@ -303,6 +303,7 @@ export class Splitter extends Building {
         this.outputInventoryCapacity = 5;
         this.distributionTimer = 0;
         this.distributionInterval = 0.5; // 0.5秒ごとに分配
+        this.lastDistributedOutput = 2; // 最後に分配した出力ポート (1または2)。最初は2から始めることで、output1から分配されるようにする
     }
 
     update(deltaTime, game) {
@@ -319,18 +320,22 @@ export class Splitter extends Building {
                 const hasSpace2 = this.outputInventory2.length < this.outputInventoryCapacity;
 
                 if (hasSpace1 && hasSpace2) {
-                    // 両方に空きがあれば交互に分配
-                    if (this.outputInventory1.length <= this.outputInventory2.length) {
-                        this.outputInventory1.push(this.inputInventory.shift());
-                    } else {
+                    // 両方に空きがあれば、前回と逆の出力に分配
+                    if (this.lastDistributedOutput === 1) {
                         this.outputInventory2.push(this.inputInventory.shift());
+                        this.lastDistributedOutput = 2;
+                    } else {
+                        this.outputInventory1.push(this.inputInventory.shift());
+                        this.lastDistributedOutput = 1;
                     }
                 } else if (hasSpace1) {
                     // output1にのみ空きがあればそちらへ
                     this.outputInventory1.push(this.inputInventory.shift());
+                    this.lastDistributedOutput = 1;
                 } else if (hasSpace2) {
                     // output2にのみ空きがあればそちらへ
                     this.outputInventory2.push(this.inputInventory.shift());
+                    this.lastDistributedOutput = 2;
                 }
                 // 両方満杯の場合はinputInventoryに留まる (バックプレッシャー)
             }
